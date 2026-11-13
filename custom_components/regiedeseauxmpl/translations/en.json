@@ -6,7 +6,8 @@
                 "description": "Enter your credentials for Régie des Eaux de Montpellier Méditerranée Métropole.",
                 "data": {
                     "username": "Email / Username",
-                    "password": "Password"
+                    "password": "Password",
+                    "update_time": "Daily reading time"
                 }
             }
         },
@@ -20,6 +21,17 @@
             "description_placeholder": ""
         }
     },
+    "options": {
+        "step": {
+            "init": {
+                "title": "Régie des Eaux Montpellier options",
+                "description": "The water meter is read once a day at the configured time. The Régie publishes the previous day's reading overnight.",
+                "data": {
+                    "update_time": "Daily reading time"
+                }
+            }
+        }
+    },
     "entity": {
         "sensor": {
             "water_index": {
@@ -30,19 +42,6 @@
     "state": {
         "regiedeseauxmpl": {
             "water": "{} m³"
-        }
-    },
-    "select": {
-        "update_interval": {
-            "name": "Update interval",
-            "options": {
-                "3600": "1 hour",
-                "7200": "2 hours",
-                "10800": "3 hours",
-                "21600": "6 hours",
-                "43200": "12 hours",
-                "86400": "24 hours"
-            }
         }
     }
 }

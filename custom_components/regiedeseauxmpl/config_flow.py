@@ -1,45 +1,29 @@
 """Config flow for Régie des Eaux Montpellier integration."""
 from __future__ import annotations
 
-from datetime import timedelta
-
 import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.selector import (
+    TextSelector,
+    TextSelectorConfig,
+    TextSelectorType,
+)
 
 from .api import RegieDesEauxAPI
 from .const import (
     CONF_PASSWORD,
-    CONF_SCAN_INTERVAL,
+    CONF_UPDATE_TIME,
     CONF_USERNAME,
-    DEFAULT_SCAN_INTERVAL,
+    DEFAULT_UPDATE_TIME,
     DOMAIN,
     LOGGER,
 )
 from .exceptions import CannotConnect, InvalidAuth
 
-# Scan interval options (in hours)
-SCAN_INTERVAL_OPTIONS = [
-    timedelta(hours=1),
-    timedelta(hours=2),
-    timedelta(hours=3),
-    timedelta(hours=6),
-    timedelta(hours=12),
-    timedelta(hours=24),
-]
-
-STEP_USER_DATA_SCHEMA = vol.Schema(
-    {
-        vol.Required(CONF_USERNAME): str,
-        vol.Required(CONF_PASSWORD): str,
-        vol.Optional(
-            CONF_SCAN_INTERVAL,
-            default=DEFAULT_SCAN_INTERVAL.total_seconds()
-        ): vol.In([x.total_seconds() for x in SCAN_INTERVAL_OPTIONS]),
-    }
-)
+TIME_SELECTOR = TextSelector(TextSelectorConfig(type=TextSelectorType.TIME))
 
 
 async def validate_input(hass: HomeAssistant, data: dict[str, str]) -> dict[str, str]:
@@ -53,14 +37,14 @@ async def validate_input(hass: HomeAssistant, data: dict[str, str]) -> dict[str,
     # Return info that you want to store in the config entry.
     return {
         "title": data[CONF_USERNAME],
-        CONF_SCAN_INTERVAL: data.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL.total_seconds()),
+        CONF_UPDATE_TIME: data.get(CONF_UPDATE_TIME, DEFAULT_UPDATE_TIME),
     }
 
 
 class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle a config flow for Régie des Eaux Montpellier."""
 
-    VERSION = 1
+    VERSION = 2
     CONNECTION_CLASS = config_entries.CONN_CLASS_CLOUD_POLL
 
     async def async_step_user(
@@ -87,30 +71,16 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         )
 
     def _build_schema(self) -> vol.Schema:
-        """Build the schema with translated options."""
-        # Get scan interval options with translations
-        scan_interval_options = {
-            str(int(x.total_seconds())): self._format_scan_interval(x)
-            for x in SCAN_INTERVAL_OPTIONS
-        }
-
+        """Build the schema for the initial step."""
         return vol.Schema(
             {
                 vol.Required(CONF_USERNAME): str,
                 vol.Required(CONF_PASSWORD): str,
                 vol.Optional(
-                    CONF_SCAN_INTERVAL,
-                    default=str(int(DEFAULT_SCAN_INTERVAL.total_seconds())),
-                ): vol.In(scan_interval_options),
+                    CONF_UPDATE_TIME, default=DEFAULT_UPDATE_TIME
+                ): TIME_SELECTOR,
             }
         )
-
-    def _format_scan_interval(self, interval: timedelta) -> str:
-        """Format scan interval for display."""
-        total_hours = int(interval.total_seconds() / 3600)
-        if total_hours == 1:
-            return "1 hour"
-        return f"{total_hours} hours"
 
     @staticmethod
     @callback
@@ -135,30 +105,17 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
             return self.async_create_entry(title="", data=merged)
 
         current = self.config_entry.options
+        update_time = current.get(
+            CONF_UPDATE_TIME,
+            self.config_entry.data.get(CONF_UPDATE_TIME, DEFAULT_UPDATE_TIME),
+        )
         return self.async_show_form(
             step_id="init",
             data_schema=vol.Schema(
                 {
                     vol.Optional(
-                        CONF_SCAN_INTERVAL,
-                        default=current.get(
-                            CONF_SCAN_INTERVAL,
-                            str(int(DEFAULT_SCAN_INTERVAL.total_seconds())),
-                        ),
-                    ): vol.In(
-                        {
-                            str(int(x.total_seconds())): self._format_scan_interval(x)
-                            for x in SCAN_INTERVAL_OPTIONS
-                        }
-                    ),
+                        CONF_UPDATE_TIME, default=update_time
+                    ): TIME_SELECTOR,
                 }
             ),
         )
-
-    @staticmethod
-    def _format_scan_interval(interval: timedelta) -> str:
-        """Format scan interval for display."""
-        total_hours = int(interval.total_seconds() / 3600)
-        if total_hours == 1:
-            return "1 hour"
-        return f"{total_hours} hours"

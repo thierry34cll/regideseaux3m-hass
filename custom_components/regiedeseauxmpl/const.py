@@ -11,10 +11,12 @@ LOGGER = logging.getLogger(__package__)
 CONF_USERNAME = "username"
 CONF_PASSWORD = "password"
 CONF_METERS = "meters"
-CONF_SCAN_INTERVAL = "scan_interval"
+CONF_SCAN_INTERVAL = "scan_interval"  # legacy (config entries v1), migrated to CONF_UPDATE_TIME
+CONF_UPDATE_TIME = "update_time"
 
 # Default values
-DEFAULT_SCAN_INTERVAL = timedelta(hours=6)
+DEFAULT_SCAN_INTERVAL = timedelta(hours=6)  # legacy
+DEFAULT_UPDATE_TIME = "05:00"
 DEFAULT_NAME = "Régie des Eaux Montpellier"
 
 # Minimum and maximum scan intervals

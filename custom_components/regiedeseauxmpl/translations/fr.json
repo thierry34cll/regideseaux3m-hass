@@ -6,7 +6,8 @@
                 "description": "Saisissez vos identifiants pour la Régie des Eaux de Montpellier Méditerranée Métropole.",
                 "data": {
                     "username": "E-mail / Identifiant",
-                    "password": "Mot de passe"
+                    "password": "Mot de passe",
+                    "update_time": "Heure de relevé quotidienne"
                 }
             }
         },
@@ -20,6 +21,17 @@
             "description_placeholder": ""
         }
     },
+    "options": {
+        "step": {
+            "init": {
+                "title": "Options de la Régie des Eaux Montpellier",
+                "description": "Le compteur est relevé une fois par jour à l'heure configurée. La Régie publie la veille dans la nuit.",
+                "data": {
+                    "update_time": "Heure de relevé quotidienne"
+                }
+            }
+        }
+    },
     "entity": {
         "sensor": {
             "water_index": {
@@ -30,19 +42,6 @@
     "state": {
         "regiedeseauxmpl": {
             "water": "{} m³"
-        }
-    },
-    "select": {
-        "update_interval": {
-            "name": "Intervalle de mise à jour",
-            "options": {
-                "3600": "1 heure",
-                "7200": "2 heures",
-                "10800": "3 heures",
-                "21600": "6 heures",
-                "43200": "12 heures",
-                "86400": "24 heures"
-            }
         }
     }
 }

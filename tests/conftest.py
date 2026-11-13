@@ -40,6 +40,7 @@ HA_MODULES = [
     "homeassistant.helpers.entity_registry",
     "homeassistant.helpers.config_entry_flow",
     "homeassistant.helpers.data_entry_flow",
+    "homeassistant.helpers.event",
     "homeassistant.helpers.selector",
     "homeassistant.helpers.template",
     "homeassistant.helpers.storage",
@@ -281,6 +282,7 @@ parent_modules = [
     "homeassistant.helpers.entity_platform",
     "homeassistant.helpers.device_registry",
     "homeassistant.helpers.entity_registry",
+    "homeassistant.helpers.event",
     "homeassistant.components",
     "homeassistant.components.sensor",
     "homeassistant.components.diagnostics",
@@ -328,6 +330,15 @@ sys.modules["homeassistant.helpers.aiohttp_client"].async_get_clientsession = mo
 # CONN_CLASS
 sys.modules["homeassistant.config_entries"].CONN_CLASS = MockCONNCLASS
 sys.modules["homeassistant.config_entries"].CONN_CLASS_CLOUD_POLL = "cloud_polling"
+
+# callback decorator (identity)
+sys.modules["homeassistant.core"].callback = lambda func: func
+
+# async_track_time_change (event helper): returns an unsubscribe callback
+sys.modules["homeassistant.helpers.event"] = MockModule()
+sys.modules["homeassistant.helpers.event"].async_track_time_change = MagicMock(
+    return_value=MagicMock()
+)
 
 # Sensor classes
 sys.modules["homeassistant.components.sensor"].SensorDeviceClass = MockSensorDeviceClass
