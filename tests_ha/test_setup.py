@@ -311,3 +311,15 @@ async def test_remove_entry_clears_history_flags(hass, mock_api, config_entry):
     data = await Store(hass, 1, STORAGE_KEY_HISTORY).async_load()
     assert sid not in (data or {}).get("done", {})
     assert config_entry.entry_id not in (data or {}).get("entries", {})
+
+
+def test_manifest_declares_recorder_dependency():
+    """The integration writes recorder statistics: it must declare the
+    'recorder' dependency so HA sets the recorder up before this integration."""
+    import json
+    from pathlib import Path
+
+    manifest = json.loads(
+        (Path(__file__).parent.parent / "custom_components/regiedeseauxmpl/manifest.json").read_text()
+    )
+    assert "recorder" in manifest["dependencies"]

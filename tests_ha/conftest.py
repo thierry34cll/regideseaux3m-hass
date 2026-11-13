@@ -38,6 +38,20 @@ def auto_enable_custom_integrations(enable_custom_integrations):
     return
 
 
+@pytest.fixture(autouse=True)
+def stub_recorder_component_setup(monkeypatch):
+    """The manifest declares a "recorder" dependency (needed in production so
+    the recorder is ready before this integration). Tests have no recorder
+    DB, so stub the recorder component's own setup; statistics calls in the
+    integration are patched at module level where needed."""
+    import homeassistant.components.recorder as recorder_mod
+
+    async def _fake_setup(hass, config):
+        return True
+
+    monkeypatch.setattr(recorder_mod, "async_setup", _fake_setup)
+
+
 @pytest.fixture
 def mock_api():
     """Patch the API client so no network call is made."""
