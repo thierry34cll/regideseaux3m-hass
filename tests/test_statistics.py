@@ -87,10 +87,8 @@ async def test_import_readings_skips_existing_days():
 
     with (
         patch(
-            "custom_components.regiedeseauxmpl.statistics.statistics_during_period",
-            new=AsyncMock(return_value={
-                "regiedeseauxmpl:c0001": [{"start": existing_start, "sum": 100.0}],
-            }),
+            "custom_components.regiedeseauxmpl.statistics._existing_start_timestamps",
+            new=AsyncMock(return_value={existing_start}),
         ),
         patch(
             "custom_components.regiedeseauxmpl.statistics.slugify",
@@ -130,12 +128,8 @@ async def test_import_readings_nothing_new():
     readings = [{"date": "2026-11-02", "index": 100.0}]
     with (
         patch(
-            "custom_components.regiedeseauxmpl.statistics.statistics_during_period",
-            new=AsyncMock(return_value={
-                "regiedeseauxmpl:c0001": [
-                    {"start": datetime(2026, 11, 1, tzinfo=UTC).timestamp(), "sum": 100.0}
-                ],
-            }),
+            "custom_components.regiedeseauxmpl.statistics._existing_start_timestamps",
+            new=AsyncMock(return_value={datetime(2026, 11, 1, tzinfo=UTC).timestamp()}),
         ),
         patch(
             "custom_components.regiedeseauxmpl.statistics.slugify",
@@ -151,3 +145,30 @@ async def test_import_readings_nothing_new():
 
     assert imported == 0
     mock_import.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_existing_starts_read_via_executor_job():
+    """statistics_during_period is a SYNC DB function: it must run in the
+    recorder executor (async_add_executor_job), never awaited directly."""
+    from custom_components.regiedeseauxmpl.statistics import (
+        _existing_start_timestamps,
+        statistics_during_period,
+    )
+
+    hass = MagicMock()
+    instance = MagicMock()
+    instance.async_add_executor_job = AsyncMock(
+        return_value={"regiedeseauxmpl:c0001": [{"start": 1234.0, "sum": 1.0}]}
+    )
+    with patch(
+        "custom_components.regiedeseauxmpl.statistics.get_instance",
+        return_value=instance,
+    ):
+        res = await _existing_start_timestamps(
+            hass, "regiedeseauxmpl:c0001", MagicMock(), MagicMock()
+        )
+
+    assert res == {1234.0}
+    # the sync DB function is the executor job target, not awaited
+    assert instance.async_add_executor_job.call_args.args[0] is statistics_during_period

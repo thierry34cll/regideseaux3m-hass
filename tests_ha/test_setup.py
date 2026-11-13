@@ -102,8 +102,8 @@ async def test_readings_synced_to_external_statistics(hass, mock_api, config_ent
 
     with (
         patch(
-            "custom_components.regiedeseauxmpl.statistics.statistics_during_period",
-            new=AsyncMock(return_value={}),
+            "custom_components.regiedeseauxmpl.statistics._existing_start_timestamps",
+            new=AsyncMock(return_value=set()),
         ),
         patch(
             "homeassistant.components.recorder.statistics._async_import_statistics"
@@ -159,8 +159,8 @@ async def test_smooth_consumption_spreads_gap(hass, mock_api):
 
     with (
         patch(
-            "custom_components.regiedeseauxmpl.statistics.statistics_during_period",
-            new=AsyncMock(return_value={}),
+            "custom_components.regiedeseauxmpl.statistics._existing_start_timestamps",
+            new=AsyncMock(return_value=set()),
         ),
         patch(
             "homeassistant.components.recorder.statistics._async_import_statistics"
@@ -198,8 +198,8 @@ async def test_history_import_wiring_and_once_guard(hass, mock_api, config_entry
     # 2) real import: wide window + idempotent (guard via storage, per statistic_id)
     with (
         patch(
-            "custom_components.regiedeseauxmpl.statistics.statistics_during_period",
-            new=AsyncMock(return_value={}),
+            "custom_components.regiedeseauxmpl.statistics._existing_start_timestamps",
+            new=AsyncMock(return_value=set()),
         ),
         patch(
             "homeassistant.components.recorder.statistics._async_import_statistics"
@@ -249,14 +249,15 @@ async def test_history_import_overwrite_clears_first(hass, mock_api):
 
     with (
         patch(
-            "custom_components.regiedeseauxmpl.statistics.statistics_during_period",
-            new=AsyncMock(return_value={}),
+            "custom_components.regiedeseauxmpl.statistics._existing_start_timestamps",
+            new=AsyncMock(return_value=set()),
         ),
         patch(
             "homeassistant.components.recorder.statistics._async_import_statistics"
         ) as mock_queue,
         patch(
-            "custom_components.regiedeseauxmpl.statistics.async_clear_statistics"
+            "custom_components.regiedeseauxmpl.statistics.async_clear_statistics",
+            new=AsyncMock(),
         ) as mock_clear,
     ):
         coordinator = hass.data[DOMAIN][entry.entry_id]
@@ -265,3 +266,48 @@ async def test_history_import_overwrite_clears_first(hass, mock_api):
 
     mock_clear.assert_called_once_with(hass, "C0001")
     assert mock_queue.call_count == 1
+
+
+async def test_remove_entry_clears_history_flags(hass, mock_api, config_entry):
+    """Removing the config entry clears its history-import flags, so a
+    reinstall (new entry_id) can re-import (e.g. with the overwrite option)."""
+    from homeassistant.helpers.storage import Store
+
+    from custom_components.regiedeseauxmpl import async_remove_entry
+    from custom_components.regiedeseauxmpl.const import STORAGE_KEY_HISTORY
+    from custom_components.regiedeseauxmpl.statistics import (
+        async_import_history,
+        external_statistic_id,
+    )
+
+    with patch(
+        "custom_components.regiedeseauxmpl.async_import_history", new=AsyncMock()
+    ):
+        config_entry.add_to_hass(hass)
+        assert await hass.config_entries.async_setup(config_entry.entry_id)
+        await hass.async_block_till_done()
+
+    with (
+        patch(
+            "custom_components.regiedeseauxmpl.statistics._existing_start_timestamps",
+            new=AsyncMock(return_value=set()),
+        ),
+        patch(
+            "homeassistant.components.recorder.statistics._async_import_statistics"
+        ),
+    ):
+        coordinator = hass.data[DOMAIN][config_entry.entry_id]
+        await async_import_history(hass, config_entry, coordinator)
+        await hass.async_block_till_done()
+
+    store = Store(hass, 1, STORAGE_KEY_HISTORY)
+    data = await store.async_load()
+    sid = external_statistic_id("C0001")
+    assert data["done"].get(sid) is True
+    assert sid in data["entries"][config_entry.entry_id]
+
+    await async_remove_entry(hass, config_entry)
+    # fresh Store instance: async_load caches per instance
+    data = await Store(hass, 1, STORAGE_KEY_HISTORY).async_load()
+    assert sid not in (data or {}).get("done", {})
+    assert config_entry.entry_id not in (data or {}).get("entries", {})

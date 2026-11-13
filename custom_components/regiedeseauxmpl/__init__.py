@@ -18,7 +18,11 @@ from .const import (
     PLATFORMS,
 )
 from .coordinator import RegieDesEauxCoordinator
-from .statistics import async_import_history, async_sync_meter_statistics
+from .statistics import (
+    async_import_history,
+    async_remove_history_flags,
+    async_sync_meter_statistics,
+)
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -93,6 +97,15 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             hass.services.async_remove(DOMAIN, "refresh_meters")
 
     return unload_ok
+
+
+async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Clean up the persistent history-import flags when the entry is removed.
+
+    Without this, a reinstall (new entry_id) would keep the old statistic_id
+    flags and skip the history import entirely (notably with "overwrite").
+    """
+    await async_remove_history_flags(hass, entry)
 
 
 async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:

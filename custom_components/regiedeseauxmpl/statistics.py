@@ -12,11 +12,13 @@ statistic** ``regiedeseauxmpl:<meter_id>`` via ``async_add_external_statistics``
 — the user then selects it in the Energy dashboard (Eau / Water). The
 sensor's own statistics are left untouched.
 
-All writes go through the recorder's own APIs (``async_add_external_statistics``
-/ ``Recorder.async_clear_statistics``), never through direct database access.
+All reads/writes go through the recorder's own APIs, never direct DB access.
+Note: ``statistics_during_period`` is a *sync* DB function, so it must be
+called via ``Recorder.async_add_executor_job`` (never awaited directly).
 """
 from __future__ import annotations
 
+import asyncio
 from datetime import UTC, date, datetime, time, timedelta
 
 from homeassistant.components.recorder import get_instance
@@ -48,6 +50,9 @@ from .const import (
     STORAGE_KEY_HISTORY,
 )
 from .coordinator import RegieDesEauxCoordinator
+from .entity import _short_name
+
+CLEAR_TIMEOUT = 30  # seconds
 
 
 def external_statistic_id(meter_id: str) -> str:
@@ -94,6 +99,33 @@ def compute_daily_rows(
     return sorted(rows.items())
 
 
+async def _existing_start_timestamps(
+    hass: HomeAssistant,
+    statistic_id: str,
+    first_start: datetime,
+    last_start: datetime,
+) -> set[float]:
+    """Return the unix timestamps of the days that already have statistics.
+
+    ``statistics_during_period`` is a sync DB function: it must run in the
+    recorder's executor, never awaited directly (that would raise TypeError
+    and block the event loop).
+    """
+    instance = get_instance(hass)
+    rows = await instance.async_add_executor_job(
+        statistics_during_period,
+        hass,
+        first_start,
+        last_start,
+        {statistic_id},
+        "day",
+        None,
+        {"sum"},
+    )
+    # StatisticsRow["start"] is a unix timestamp (float), not a datetime.
+    return {row["start"] for row in rows.get(statistic_id, [])}
+
+
 async def async_import_readings(
     hass: HomeAssistant,
     meter_id: str,
@@ -118,17 +150,9 @@ async def async_import_readings(
         datetime.combine(rows[-1][0], time.min)
     ).astimezone(UTC) + timedelta(days=1)
 
-    existing = await statistics_during_period(
-        hass,
-        first_start,
-        last_start,
-        {statistic_id},
-        period="day",
-        units=None,
-        types={"sum"},
+    existing_starts = await _existing_start_timestamps(
+        hass, statistic_id, first_start, last_start
     )
-    # StatisticsRow["start"] is a unix timestamp (float), not a datetime.
-    existing_starts = {row["start"] for row in existing.get(statistic_id, [])}
 
     stats = []
     for day, cumulative in rows:
@@ -158,18 +182,25 @@ async def async_import_readings(
     return len(stats)
 
 
-def async_clear_statistics(hass: HomeAssistant, meter_id: str) -> None:
-    """Clear all statistics of the external statistic for a meter.
+async def async_clear_statistics(hass: HomeAssistant, meter_id: str) -> None:
+    """Clear all statistics of the external statistic for a meter, and WAIT
+    for the recorder job to complete (so a subsequent read of existing days
+    does not race with the clear).
 
-    Uses the recorder's own queued job — the same code path as the
-    "delete" button in Developer tools > Statistics.
+    Uses the recorder's own queued job with on_done — the same code path as
+    the "delete" button in Developer tools > Statistics.
     """
-    try:
-        instance = get_instance(hass)
-    except Exception:  # noqa: BLE001 — recorder may not be running
-        LOGGER.warning("Recorder not available, cannot clear %s", meter_id)
-        return
-    instance.async_clear_statistics([external_statistic_id(meter_id)])
+    instance = get_instance(hass)
+    done = asyncio.Event()
+    instance.async_clear_statistics(
+        [external_statistic_id(meter_id)],
+        on_done=lambda: hass.loop.call_soon_threadsafe(done.set),
+    )
+    await asyncio.wait_for(done.wait(), timeout=CLEAR_TIMEOUT)
+
+
+async def _load_history_store(hass: HomeAssistant) -> Store:
+    return Store(hass, 1, STORAGE_KEY_HISTORY)
 
 
 async def async_sync_meter_statistics(
@@ -187,7 +218,11 @@ async def async_sync_meter_statistics(
         readings = readings_map.get(meter_id) or []
         try:
             imported = await async_import_readings(
-                hass, meter_id, meter.get("name") or meter_id, readings, smooth
+                hass,
+                meter_id,
+                _short_name(meter.get("name") or meter_id),
+                readings,
+                smooth,
             )
             if imported:
                 LOGGER.info(
@@ -215,11 +250,13 @@ async def async_import_history(
     - async_import_readings never duplicates a day that already has
       statistics, so even a lost flag only fills the gaps;
     - with the "overwrite" option, the external statistic of each meter is
-      cleared first — through the recorder API only, never direct DB access.
-      (The sensor's own history can be purged manually in Developer tools.)
+      cleared first AND the clear is awaited before re-reading existing days
+      (no race), through the recorder API only — never direct DB access.
     """
-    store = Store(hass, 1, STORAGE_KEY_HISTORY)
-    done = await store.async_load() or {}
+    store = await _load_history_store(hass)
+    data = await store.async_load() or {}
+    done: dict = data.setdefault("done", {})
+    entries: dict = data.setdefault("entries", {})
 
     overwrite = bool(
         entry.options.get(CONF_OVERWRITE_HISTORY)
@@ -240,19 +277,44 @@ async def async_import_history(
         try:
             if overwrite:
                 LOGGER.info("Overwrite: clearing existing statistics for %s", statistic_id)
-                async_clear_statistics(hass, meter_id)
+                await async_clear_statistics(hass, meter_id)  # awaited: no race with the read below
 
             readings = await coordinator.api.async_get_meter_readings(
                 meter_id, days=HISTORY_LOOKBACK_DAYS
             )
             imported = await async_import_readings(
-                hass, meter_id, meter.get("name") or meter_id, readings, smooth
+                hass,
+                meter_id,
+                _short_name(meter.get("name") or meter_id),
+                readings,
+                smooth,
             )
             LOGGER.info(
                 "History import for %s: %d readings over %d days -> %d statistics rows",
                 statistic_id, len(readings), HISTORY_LOOKBACK_DAYS, imported,
             )
             done[statistic_id] = True
-            await store.async_save(done)  # flag only this processed meter
+            entry_sids = entries.setdefault(entry.entry_id, [])
+            if statistic_id not in entry_sids:
+                entry_sids.append(statistic_id)
+            await store.async_save(data)  # flag only this processed meter
         except Exception as err:  # noqa: BLE001 — history must never break setup
             LOGGER.warning("History import failed for %s: %s", statistic_id, err)
+
+
+async def async_remove_history_flags(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Drop the history-import flags of a removed config entry.
+
+    Without this, a reinstall (new entry_id) would keep the old statistic_id
+    flags and skip the history import entirely (e.g. with "overwrite").
+    """
+    store = await _load_history_store(hass)
+    data = await store.async_load()
+    if not data:
+        return
+    entries: dict = data.get("entries", {})
+    sids = entries.pop(entry.entry_id, [])
+    done: dict = data.get("done", {})
+    for sid in sids:
+        done.pop(sid, None)
+    await store.async_save(data)
