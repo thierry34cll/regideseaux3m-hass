@@ -1,6 +1,6 @@
 # Régie des Eaux Montpellier
 
-[![Open in my Home Assistant](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=iopsthecloud&repository=regideseaux3m-hass&category=integration) [![HACS][hacs-badge]][hacs] [![License: MIT][license-badge]][license] [![Python 3.14+][python-badge]] [![GitHub Release][release-badge]][release] [![GitHub Last Commit][last-commit-badge]][repo]
+[![Open in my Home Assistant](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=iopsthecloud&repository=regideseaux3m-hass&category=integration) [![Marketplace (ex HACS)][hacs-badge]][hacs] [![License: MIT][license-badge]][license] [![Python 3.14+][python-badge]] [![GitHub Release][release-badge]][release] [![GitHub Last Commit][last-commit-badge]][repo]
 
 > **Intégration Home Assistant pour récupérer les index de consommation d'eau de la Régie des Eaux de Montpellier Méditerranée Métropole**
 
@@ -65,7 +65,7 @@ Cette intégration utilise **l'API interne** (découverte par reverse engineerin
 
 - [🎯 Fonctionnalités](#-fonctionnalités)
 - [📥 Installation](#-installation)
-  - [Via HACS (Recommandé)](#via-hacs-recommandé)
+  - [Via Marketplace (ex HACS) (Recommandé)](#via-marketplace-ex-hacs-recommandé)
   - [Installation manuelle](#installation-manuelle)
 - [⚙️ Configuration](#-configuration)
   - [Première configuration](#première-configuration)
@@ -110,10 +110,10 @@ Cette intégration utilise **l'API interne** (découverte par reverse engineerin
 
 [![Open in my Home Assistant](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=iopsthecloud&repository=regideseaux3m-hass&category=integration)
 
-### Via HACS (Recommandé) 🎉
+### Via Marketplace (ex HACS) (Recommandé) 🎉
 
-1. **Ouvrez HACS** dans votre Home Assistant
-   - Dans la barre latérale : **HACS** → ou via **Paramètres → HACS**
+1. **Ouvrez Marketplace (ex HACS)** dans votre Home Assistant
+   - Dans la barre latérale : **Marketplace** → ou via **Paramètres → Marketplace**
 
 2. **Ajoutez le dépôt personnalisé**
    - Cliquez sur les **trois points (⋮)** en haut à droite
@@ -155,7 +155,7 @@ Cette intégration utilise **l'API interne** (découverte par reverse engineerin
 
 4. **Redémarrez Home Assistant**
 
-5. **Configurez l'intégration** (comme pour HACS)
+5. **Configurez l'intégration** (comme pour Marketplace)
 
 ---
 
@@ -636,7 +636,7 @@ uv run pytest tests/test_meter_index.py -v -s
 
 ```
 regiedeseauxmpl/
-├── custom_components/regiedeseauxmpl/          # Intégration HACS
+├── custom_components/regiedeseauxmpl/          # Intégration Marketplace (ex HACS)
 │   ├── __init__.py                           # Setup principal + services
 │   ├── api.py                                # Client API (curl_cffi pour F5 BIG-IP)
 │   ├── const.py                              # Constantes et configuration
@@ -647,7 +647,7 @@ regiedeseauxmpl/
 │   ├── exceptions.py                         # Gestion des erreurs personnalisées
 │   ├── sensor.py                             # Entités sensor (water, total_increasing)
 │   ├── manifest.json                         # Métadonnées de l'intégration
-│   ├── info.md                               # Documentation pour le store HACS
+│   ├── info.md                               # Documentation pour le store Marketplace (ex HACS)
 │   ├── services.yaml                         # Définition des services
 │   ├── strings.json                          # Strings de base
 │   └── translations/                         # Traductions
@@ -661,12 +661,12 @@ regiedeseauxmpl/
 │   ├── test_coordinator.py                   # Tests du coordinator
 │   └── test_sensor.py                        # Tests des sensors
 │
-├── brand/                                   # Assets pour HACS (OBLIGATOIRE)
+├── brand/                                   # Assets pour Marketplace (OBLIGATOIRE)
 │   └── icon.png                             # Icône 512x512
 │
 ├── .github/workflows/                       # CI/CD
 │   ├── test_and_release.yml                  # Tests + Release GitHub
-│   └── hacs_validation.yml                  # Validation HACS
+│   └── hacs_validation.yml                  # Validation Marketplace
 │
 ├── Makefile                                 # Commandes utiles
 ├── pyproject.toml                           # Dépendances (uv/pip)
@@ -675,7 +675,7 @@ regiedeseauxmpl/
 ├── README.md                                # Documentation principale
 ├── CHANGELOG.md                             # Historique des changements
 ├── LICENSE                                  # Licence MIT
-├── hacs.json                                # Configuration HACS (racine)
+├── hacs.json                                # Configuration Marketplace (hacs.json, racine)
 └── requirements.txt                         # Dépendances (optionnel)
 ```
 
@@ -737,7 +737,7 @@ Ce projet est sous licence **MIT** - voir le fichier [LICENSE](LICENSE) pour plu
 ## 🙏 **Remerciements**
 
 - **Home Assistant** pour la plateforme incroyable et ouverte
-- **HACS** pour simplifier l'installation des intégrations personnalisées
+- **Marketplace (ex HACS)** pour simplifier l'installation des intégrations personnalisées
 - **Montpellier Méditerranée Métropole** et **la Régie des Eaux** pour leur service public essentiel
 - **Tous les contributeurs** qui aident à améliorer ce projet
 - **Les utilisateurs** qui testent et remontent les problèmes
@@ -749,12 +749,12 @@ Ce projet est sous licence **MIT** - voir le fichier [LICENSE](LICENSE) pour plu
 Pour du support :
 - **Ouvrez une Issue** : [GitHub Issues](https://github.com/iopsthecloud/regideseaux3m-hass/issues)
 - **Forum Home Assistant FR** : [Discussion sur le forum](https://community.home-assistant.io/)
-- **Documentation officielle** : [HACS](https://www.hacs.xyz/) | [Home Assistant Dev](https://developers.home-assistant.io/)
+- **Documentation officielle** : [Marketplace (ex HACS)](https://www.hacs.xyz/) | [Home Assistant Dev](https://developers.home-assistant.io/)
 
 ---
 
 [hacs]: https://hacs.xyz
-[hacs-badge]: https://img.shields.io/badge/HACS-Custom-orange.svg?style=for-the-badge&logo=homeassistantcommunitystore
+[hacs-badge]: https://img.shields.io/badge/Marketplace_(ex_HACS)-Custom-orange.svg?style=for-the-badge
 [hacs-repo]: https://my.home-assistant.io/redirect/hacs_repository/?owner=iopsthecloud&repository=regideseaux3m-hass&category=integration
 [license]: LICENSE
 [license-badge]: https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge&logo=open-source-initiative
