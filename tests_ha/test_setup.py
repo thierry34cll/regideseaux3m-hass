@@ -125,3 +125,60 @@ async def test_readings_synced_to_statistics_after_setup(hass, mock_api, config_
     # readings 2026-10-19 and 2026-10-20 -> consumption days 2026-10-18/19
     assert [s["sum"] for s in stats] == [122.456, 123.456]
     assert [s["start"].date().isoformat() for s in stats] == ["2026-10-18", "2026-10-19"]
+
+
+async def test_smooth_consumption_spreads_gap(hass, mock_api):
+    """With the smoothing option on, a cumulative reading is spread over the gap."""
+    from pytest_homeassistant_custom_component.common import MockConfigEntry
+
+    from custom_components.regiedeseauxmpl.const import (
+        CONF_PASSWORD,
+        CONF_SMOOTH_CONSUMPTION,
+        CONF_USERNAME,
+    )
+    from custom_components.regiedeseauxmpl.statistics import (
+        async_sync_meter_statistics,
+        meter_entity_id,
+    )
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        version=2,
+        title="test@example.com",
+        data={CONF_USERNAME: "test@example.com", CONF_PASSWORD: "secret"},
+        options={CONF_SMOOTH_CONSUMPTION: True},
+    )
+    # gap: readings on 2026-10-19 and 2026-10-22 (1 m³ over a 3-day gap)
+    readings = [
+        {"date": "2026-10-19", "index": 122.0},
+        {"date": "2026-10-22", "index": 123.0},
+    ]
+    with patch(
+        "custom_components.regiedeseauxmpl.api.RegieDesEauxAPI.async_get_meter_readings",
+        new=AsyncMock(return_value=readings),
+    ):
+        entry.add_to_hass(hass)
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+
+    entity_id = meter_entity_id(hass, "C0001")
+    with (
+        patch(
+            "custom_components.regiedeseauxmpl.statistics.statistics_during_period",
+            new=AsyncMock(return_value={}),
+        ),
+        patch(
+            "custom_components.regiedeseauxmpl.statistics.async_import_statistics"
+        ) as mock_import,
+    ):
+        coordinator = hass.data[DOMAIN][entry.entry_id]
+        await async_sync_meter_statistics(hass, entry, coordinator)
+        await hass.async_block_till_done()
+
+    assert mock_import.call_count == 1
+    stats = mock_import.call_args.args[2]
+    # consumption days 10-18 (122.0) then 10-19..10-21 spread of 1 m³
+    assert [s["start"].date().isoformat() for s in stats] == [
+        "2026-10-18", "2026-10-19", "2026-10-20", "2026-10-21",
+    ]
+    assert [round(s["sum"], 3) for s in stats] == [122.0, 122.333, 122.667, 123.0]

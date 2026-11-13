@@ -7,6 +7,7 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.selector import (
+    BooleanSelector,
     TextSelector,
     TextSelectorConfig,
     TextSelectorType,
@@ -15,8 +16,10 @@ from homeassistant.helpers.selector import (
 from .api import RegieDesEauxAPI
 from .const import (
     CONF_PASSWORD,
+    CONF_SMOOTH_CONSUMPTION,
     CONF_UPDATE_TIME,
     CONF_USERNAME,
+    DEFAULT_SMOOTH_CONSUMPTION,
     DEFAULT_UPDATE_TIME,
     DOMAIN,
     LOGGER,
@@ -109,6 +112,14 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
             CONF_UPDATE_TIME,
             self.config_entry.data.get(CONF_UPDATE_TIME, DEFAULT_UPDATE_TIME),
         )
+        smooth = bool(
+            current.get(
+                CONF_SMOOTH_CONSUMPTION,
+                self.config_entry.data.get(
+                    CONF_SMOOTH_CONSUMPTION, DEFAULT_SMOOTH_CONSUMPTION
+                ),
+            )
+        )
         return self.async_show_form(
             step_id="init",
             data_schema=vol.Schema(
@@ -116,6 +127,9 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                     vol.Optional(
                         CONF_UPDATE_TIME, default=update_time
                     ): TIME_SELECTOR,
+                    vol.Optional(
+                        CONF_SMOOTH_CONSUMPTION, default=smooth
+                    ): BooleanSelector(),
                 }
             ),
         )
