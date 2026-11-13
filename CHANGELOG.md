@@ -16,7 +16,6 @@ et ce projet adhère à [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - **Import de l'historique à l'installation** (option cochée par défaut, fenêtre large demandée à l'API) + option « écraser les données existantes » (purge via les API recorder uniquement, jamais d'accès direct à la base). Gardes-fous : exécution unique par entrée (flag persistant) et import idempotent (les jours déjà présents en statistiques ne sont jamais réimportés)
 - Support multi-compteurs avec gestion individuelle
 - Intégration native au tableau de bord Énergie/Eau de Home Assistant
-- Configuration de l'intervalle de mise à jour (30 min à 24h)
 - Service `regiedeseauxmpl.refresh_meters` pour rafraîchir manuellement
 - Outils de diagnostic via l'intégration Diagnostics
 - Traductions complètes en français et anglais
