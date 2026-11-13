@@ -7,7 +7,9 @@
                 "data": {
                     "username": "E-mail / Identifiant",
                     "password": "Mot de passe",
-                    "update_time": "Heure de relevé quotidienne"
+                    "update_time": "Heure de relevé quotidienne",
+                    "import_history": "Récupérer l'historique de consommation disponible en ligne",
+                    "overwrite_history": "Écraser les données existantes avant l'import (efface les statistiques/états actuels du capteur)"
                 }
             }
         },

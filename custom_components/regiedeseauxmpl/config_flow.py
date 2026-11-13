@@ -15,10 +15,14 @@ from homeassistant.helpers.selector import (
 
 from .api import RegieDesEauxAPI
 from .const import (
+    CONF_IMPORT_HISTORY,
+    CONF_OVERWRITE_HISTORY,
     CONF_PASSWORD,
     CONF_SMOOTH_CONSUMPTION,
     CONF_UPDATE_TIME,
     CONF_USERNAME,
+    DEFAULT_IMPORT_HISTORY,
+    DEFAULT_OVERWRITE_HISTORY,
     DEFAULT_SMOOTH_CONSUMPTION,
     DEFAULT_UPDATE_TIME,
     DOMAIN,
@@ -82,6 +86,12 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 vol.Optional(
                     CONF_UPDATE_TIME, default=DEFAULT_UPDATE_TIME
                 ): TIME_SELECTOR,
+                vol.Optional(
+                    CONF_IMPORT_HISTORY, default=DEFAULT_IMPORT_HISTORY
+                ): BooleanSelector(),
+                vol.Optional(
+                    CONF_OVERWRITE_HISTORY, default=DEFAULT_OVERWRITE_HISTORY
+                ): BooleanSelector(),
             }
         )
 

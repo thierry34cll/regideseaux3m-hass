@@ -14,12 +14,19 @@ CONF_METERS = "meters"
 CONF_SCAN_INTERVAL = "scan_interval"  # legacy (config entries v1), migrated to CONF_UPDATE_TIME
 CONF_UPDATE_TIME = "update_time"
 CONF_SMOOTH_CONSUMPTION = "smooth_consumption"
+CONF_IMPORT_HISTORY = "import_history"
+CONF_OVERWRITE_HISTORY = "overwrite_history"
 
 # Default values
 DEFAULT_SCAN_INTERVAL = timedelta(hours=6)  # legacy
 DEFAULT_UPDATE_TIME = "05:00"
 DEFAULT_SMOOTH_CONSUMPTION = False
+DEFAULT_IMPORT_HISTORY = True
+DEFAULT_OVERWRITE_HISTORY = False
 DEFAULT_NAME = "Régie des Eaux Montpellier"
+
+# Storage key marking that the one-time history import already ran (per entry)
+STORAGE_KEY_HISTORY = f"{DOMAIN}_history_imported"
 
 # A reading published on day D reflects the consumption of day D-1.
 READING_DATE_OFFSET_DAYS = 1

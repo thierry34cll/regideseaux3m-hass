@@ -7,7 +7,9 @@
                 "data": {
                     "username": "Email / Username",
                     "password": "Password",
-                    "update_time": "Daily reading time"
+                    "update_time": "Daily reading time",
+                    "import_history": "Import all consumption history available online",
+                    "overwrite_history": "Overwrite existing data before import (clears current sensor statistics/states)"
                 }
             }
         },

@@ -28,14 +28,19 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import UnitOfVolume
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_registry import async_get as async_get_entity_registry
+from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
 
 from .const import (
+    CONF_OVERWRITE_HISTORY,
     CONF_SMOOTH_CONSUMPTION,
+    DEFAULT_OVERWRITE_HISTORY,
     DEFAULT_SMOOTH_CONSUMPTION,
     DOMAIN,
+    HISTORY_LOOKBACK_DAYS,
     LOGGER,
     READING_DATE_OFFSET_DAYS,
+    STORAGE_KEY_HISTORY,
 )
 from .coordinator import RegieDesEauxCoordinator
 
@@ -79,6 +84,18 @@ def meter_entity_id(hass: HomeAssistant, meter_id: str) -> str | None:
     """Return the sensor entity_id for a meter (unique_id = f"{DOMAIN}_{meter_id}")."""
     registry = async_get_entity_registry(hass)
     return registry.async_get_entity_id("sensor", DOMAIN, f"{DOMAIN}_{meter_id}")
+
+
+async def _wait_for_entity_id(hass: HomeAssistant, meter_id: str, tries: int = 50) -> str | None:
+    """Wait (yielding to the loop, never block_till_done) for the sensor to register."""
+    import asyncio
+
+    for _ in range(tries):
+        entity_id = meter_entity_id(hass, meter_id)
+        if entity_id:
+            return entity_id
+        await asyncio.sleep(0)
+    return None
 
 
 async def async_import_readings(
@@ -163,10 +180,9 @@ async def async_sync_meter_statistics(
             entry.data.get(CONF_SMOOTH_CONSUMPTION, DEFAULT_SMOOTH_CONSUMPTION),
         )
     )
-    await hass.async_block_till_done()
     readings_map = coordinator.data.get("readings", {})
     for meter_id, meter in coordinator.data.get("meters", {}).items():
-        entity_id = meter_entity_id(hass, meter_id)
+        entity_id = await _wait_for_entity_id(hass, meter_id)
         if not entity_id:
             LOGGER.debug("No entity yet for meter %s, skipping statistics", meter_id)
             continue
@@ -181,3 +197,69 @@ async def async_sync_meter_statistics(
                 )
         except Exception as err:  # noqa: BLE001 — statistics must never break polling
             LOGGER.warning("Could not import statistics for %s: %s", entity_id, err)
+
+
+async def async_import_history(
+    hass: HomeAssistant, entry: ConfigEntry, coordinator: RegieDesEauxCoordinator
+) -> None:
+    """One-time import of all readings available online (install option).
+
+    Guards against duplicates/re-runs:
+    - runs only once per config entry (persistent flag in HA storage), so a
+      reinstall on the same HA instance does not re-import;
+    - async_import_readings never duplicates a day that already has
+      statistics, so even a lost flag only fills the gaps;
+    - with the "overwrite" option, existing statistics and states of the
+      sensors are cleared first — through the recorder APIs only (the same
+      code path as the Developer tools UI), never direct DB access.
+    """
+    store = Store(hass, 1, STORAGE_KEY_HISTORY)
+    done = await store.async_load() or {}
+    if done.get(entry.entry_id):
+        LOGGER.debug("History already imported for entry %s, skipping", entry.entry_id)
+        return
+
+    overwrite = bool(
+        entry.options.get(CONF_OVERWRITE_HISTORY)
+        or entry.data.get(CONF_OVERWRITE_HISTORY, DEFAULT_OVERWRITE_HISTORY)
+    )
+    smooth = bool(
+        entry.options.get(
+            CONF_SMOOTH_CONSUMPTION,
+            entry.data.get(CONF_SMOOTH_CONSUMPTION, DEFAULT_SMOOTH_CONSUMPTION),
+        )
+    )
+
+    for meter_id, meter in coordinator.data.get("meters", {}).items():
+        entity_id = await _wait_for_entity_id(hass, meter_id)
+        if not entity_id:
+            LOGGER.debug("No entity yet for meter %s, skipping history", meter_id)
+            continue
+        try:
+            if overwrite:
+                LOGGER.info("Overwrite: clearing existing statistics for %s", entity_id)
+                async_clear_statistics(hass, entity_id)
+                try:
+                    await hass.services.async_call(
+                        "recorder",
+                        "purge_entities",
+                        {"entity_id": [entity_id]},
+                        blocking=True,
+                    )
+                except Exception as err:  # noqa: BLE001
+                    LOGGER.warning("Could not purge states for %s: %s", entity_id, err)
+
+            readings = await coordinator.api.async_get_meter_readings(
+                meter_id, days=HISTORY_LOOKBACK_DAYS
+            )
+            imported = await async_import_readings(
+                hass, entity_id, meter.get("name") or meter_id, readings, smooth
+            )
+            LOGGER.info(
+                "History import for %s: %d readings over %d days -> %d statistics rows",
+                entity_id, len(readings), HISTORY_LOOKBACK_DAYS, imported,
+            )
+        except Exception as err:  # noqa: BLE001 — history must never break setup
+            LOGGER.warning("History import failed for %s: %s", entity_id, err)
+
+    await store.async_save({**done, entry.entry_id: True})

@@ -7,16 +7,18 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .api import RegieDesEauxAPI
 from .const import (
+    CONF_IMPORT_HISTORY,
     CONF_PASSWORD,
     CONF_UPDATE_TIME,
     CONF_USERNAME,
+    DEFAULT_IMPORT_HISTORY,
     DEFAULT_UPDATE_TIME,
     DOMAIN,
     LOGGER,
     PLATFORMS,
 )
 from .coordinator import RegieDesEauxCoordinator
-from .statistics import async_sync_meter_statistics
+from .statistics import async_import_history, async_sync_meter_statistics
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -56,6 +58,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     entry.async_on_unload(coordinator.async_add_listener(_schedule_stats_sync))
     hass.async_create_task(async_sync_meter_statistics(hass, entry, coordinator))
+
+    # One-time import of the whole history available online (install option,
+    # enabled by default). Guarded: runs once per entry and never duplicates
+    # existing statistics.
+    if entry.data.get(
+        CONF_IMPORT_HISTORY,
+        entry.options.get(CONF_IMPORT_HISTORY, DEFAULT_IMPORT_HISTORY),
+    ):
+        hass.async_create_task(async_import_history(hass, entry, coordinator))
 
     # Register services
     async def handle_refresh(call):

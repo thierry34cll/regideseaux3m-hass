@@ -171,7 +171,9 @@ Cette intégration utilise **l'API interne** (découverte par reverse engineerin
 2. **Saisissez vos identifiants**
    - **Adresse email / Identifiant** : Votre email de connexion à [l'agence en ligne](https://ael.regiedeseaux3m.fr/)
    - **Mot de passe** : Votre mot de passe de l'agence en ligne
-   - **Intervalle de mise à jour** : Fréquence de rafraîchissement (par défaut : 6 heures)
+   - **Heure de relevé quotidienne** : heure du rafraîchissement (par défaut : `05:00`). La Régie ne publie l'index qu'une fois par jour, dans la nuit : un relevé quotidien à heure fixe suffit
+   - **Récupérer l'historique disponible en ligne** (coché par défaut) : importe une seule fois tout l'historique de consommation renvoyé par la Régie, en l'attribuant à la **date réelle de consommation** (veille du relevé)
+   - **Écraser les données existantes avant l'import** (décoché par défaut) : efface d'abord les statistiques/états actuels du capteur (via les API du recorder, comme le bouton supprimer de l'interface) avant de réimporter proprement
 
 3. **Validez**
    - Cliquez sur **"Soumettre"**
@@ -182,15 +184,18 @@ Cette intégration utilise **l'API interne** (découverte par reverse engineerin
 
 Une fois l'intégration configurée, vous pouvez modifier les paramètres :
 
-1. **Changer l'intervalle de mise à jour**
+1. **Changer l'heure de relevé quotidienne**
    - Allez dans **Paramètres → Appareils et services**
    - Trouvez votre intégration **"Régie des Eaux Montpellier"**
    - Cliquez sur les **trois points (⋮)** → **"Options"**
-   - Modifiez l'intervalle de mise à jour (30 min, 1h, 2h, 3h, 6h, 12h, 24h)
+   - Modifiez l'heure de relevé (ex. `05:00`) — l'intégration est rechargée automatiquement
    - Sauvegardez
 
-2. **Forcer un rafraîchissement manuel**
-   - Via l'interface : **Développeur → Services** → `regiedeseauxmpl.refresh_meters`
+2. **Lisser la consommation sur les jours sans relevé** (option)
+   - Quand la Régie n'effectue pas de relevé certains jours, le relevé suivant est cumulé : cette option répartit la consommation sur les jours manquants (ex. 1 m³ après 3 jours sans relevé → ~0,33 m³/jour)
+
+3. **Forcer un rafraîchissement manuel**
+   - Via l'interface : **Développeur → Actions** → `regiedeseauxmpl.refresh_meters`
    - Via une automatisation (voir [Exemples](#-exemples-dautomatisations))
 
 ---
@@ -504,7 +509,7 @@ L'API de la Régie des Eaux utilise un **load balancer F5 BIG-IP** qui effectue 
 - ❌ Problème de DNS
 
 **Solutions :**
-- ✅ Augmentez l'intervalle de mise à jour (ex: 12h au lieu de 1h)
+- ✅ Le relevé est quotidien à heure fixe (par défaut 05:00) : inutile d'interroger l'API plus souvent, la Régie ne publie qu'une fois par jour
 - ✅ Vérifiez votre connexion internet
 - ✅ Essayez à un autre moment de la journée
 
