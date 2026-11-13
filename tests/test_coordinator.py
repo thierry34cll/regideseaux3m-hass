@@ -33,6 +33,9 @@ def mock_api():
         {"id": "meter2", "name": "Compteur 2", "serial_number": "SN002"},
     ])
     api.async_get_meter_index = AsyncMock(return_value={"index": 123.456, "timestamp": "2024-01-01"})
+    api.async_get_meter_readings = AsyncMock(return_value=[
+        {"date": "2024-01-01", "index": 123.456},
+    ])
     return api
 
 
@@ -94,14 +97,18 @@ async def test_coordinator_update_data_success(mock_hass, mock_api):
     mock_api.async_get_meters = AsyncMock(return_value=[
         {"id": "meter1", "name": "Test Meter"},
     ])
-    mock_api.async_get_meter_index = AsyncMock(return_value={"index": 100.5, "timestamp": "2024-01-01"})
+    mock_api.async_get_meter_readings = AsyncMock(return_value=[
+        {"date": "2024-01-01", "index": 100.0},
+        {"date": "2024-01-02", "index": 100.5},
+    ])
 
     data = await coordinator._async_update_data()
 
     assert "meters" in data
     assert "meter1" in data["meters"]
     assert data["meters"]["meter1"]["index"] == 100.5
-    assert data["meters"]["meter1"]["timestamp"] == "2024-01-01"
+    assert data["meters"]["meter1"]["timestamp"] == "2024-01-02"
+    assert data["readings"]["meter1"][-1]["index"] == 100.5
     assert "last_updated" in data
 
 

@@ -1,0 +1,133 @@
+"""Tests for the dated-statistics computation (Régie des Eaux readings)."""
+
+from datetime import UTC, date, datetime
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
+
+from custom_components.regiedeseauxmpl.statistics import (
+    async_import_readings,
+    compute_daily_rows,
+    consumption_date,
+)
+from custom_components.regiedeseauxmpl.const import READING_DATE_OFFSET_DAYS
+
+READINGS = [
+    {"date": "2026-11-02", "index": 100.0},
+    {"date": "2026-11-03", "index": 101.0},
+    # no reading on 2026-11-04 / 2026-11-05
+    {"date": "2026-11-06", "index": 102.0},
+]
+
+
+def test_consumption_date_offset():
+    """A reading published on day D is the consumption of day D-1."""
+    assert READING_DATE_OFFSET_DAYS == 1
+    assert consumption_date("2026-11-06") == date(2026, 11, 5)
+
+
+def test_compute_daily_rows_without_smoothing():
+    """One row per reading, on its consumption day, cumulative sum."""
+    rows = compute_daily_rows(READINGS, smooth=False)
+    assert rows == [
+        (date(2026, 11, 1), 100.0),
+        (date(2026, 11, 2), 101.0),
+        (date(2026, 11, 5), 102.0),
+    ]
+
+
+def test_compute_daily_rows_with_smoothing():
+    """A 1 m³ delta appearing after a 3-day gap is spread over the 3 days."""
+    rows = compute_daily_rows(READINGS, smooth=True)
+    assert rows == [
+        (date(2026, 11, 1), 100.0),
+        (date(2026, 11, 2), 101.0),
+        (date(2026, 11, 3), round(101.0 + 1 / 3, 6)),
+        (date(2026, 11, 4), round(101.0 + 2 / 3, 6)),
+        (date(2026, 11, 5), 102.0),
+    ]
+
+
+def test_compute_daily_rows_user_example():
+    """1 m³ on Nov 6 after no data on Nov 3-5 -> 0.25 m³/day over 4 days."""
+    readings = [
+        {"date": "2026-11-02", "index": 50.0},
+        {"date": "2026-11-06", "index": 51.0},
+    ]
+    rows = compute_daily_rows(readings, smooth=True)
+    # consumption days: Nov 1 (reading Nov 2), then gap Nov 2 -> Nov 5 = 4 days? no:
+    # gap between consumption days 11-01 and 11-05 is 4 days -> 0.25/day
+    assert rows == [
+        (date(2026, 11, 1), 50.0),
+        (date(2026, 11, 2), 50.25),
+        (date(2026, 11, 3), 50.5),
+        (date(2026, 11, 4), 50.75),
+        (date(2026, 11, 5), 51.0),
+    ]
+
+
+def test_compute_daily_rows_empty():
+    assert compute_daily_rows([], smooth=True) == []
+
+
+@pytest.mark.asyncio
+async def test_import_readings_skips_existing_days():
+    """Idempotency guard: days that already have statistics are not re-imported."""
+    hass = MagicMock()
+    readings = [
+        {"date": "2026-11-02", "index": 100.0},
+        {"date": "2026-11-03", "index": 101.0},
+    ]
+    existing_start = datetime(2026, 11, 1, tzinfo=UTC)  # consumption day of 11-02
+
+    from types import SimpleNamespace
+
+    with (
+        patch(
+            "custom_components.regiedeseauxmpl.statistics.statistics_during_period",
+            new=AsyncMock(return_value={
+                "sensor.test": [{"start": existing_start, "sum": 100.0}],
+            }),
+        ),
+        patch(
+            "custom_components.regiedeseauxmpl.statistics.StatisticData",
+            new=lambda **kw: SimpleNamespace(**kw),
+        ),
+        patch(
+            "custom_components.regiedeseauxmpl.statistics.async_import_statistics"
+        ) as mock_import,
+    ):
+        imported = await async_import_readings(
+            hass, "sensor.test", "Compteur", readings, smooth=False
+        )
+
+    assert imported == 1  # only 2026-11-02 reading (consumption 11-02) is new
+    assert mock_import.call_count == 1
+    stats = mock_import.call_args.args[2]
+    assert len(stats) == 1
+    assert stats[0].start == datetime(2026, 11, 2, tzinfo=UTC)
+    assert stats[0].sum == 101.0
+
+
+@pytest.mark.asyncio
+async def test_import_readings_nothing_new():
+    """When everything already exists, no import call is made."""
+    hass = MagicMock()
+    readings = [{"date": "2026-11-02", "index": 100.0}]
+    with (
+        patch(
+            "custom_components.regiedeseauxmpl.statistics.statistics_during_period",
+            new=AsyncMock(return_value={
+                "sensor.test": [{"start": datetime(2026, 11, 1, tzinfo=UTC), "sum": 100.0}],
+            }),
+        ),
+        patch(
+            "custom_components.regiedeseauxmpl.statistics.async_import_statistics"
+        ) as mock_import,
+    ):
+        imported = await async_import_readings(
+            hass, "sensor.test", "Compteur", readings, smooth=False
+        )
+
+    assert imported == 0
+    mock_import.assert_not_called()

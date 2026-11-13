@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .api import RegieDesEauxAPI
@@ -16,6 +16,7 @@ from .const import (
     PLATFORMS,
 )
 from .coordinator import RegieDesEauxCoordinator
+from .statistics import async_sync_meter_statistics
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -45,6 +46,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+
+    # Import each new reading into the recorder statistics at its real
+    # consumption date (the live state itself is always timestamped at
+    # request time, which cannot be backdated).
+    @callback
+    def _schedule_stats_sync() -> None:
+        hass.async_create_task(async_sync_meter_statistics(hass, entry, coordinator))
+
+    entry.async_on_unload(coordinator.async_add_listener(_schedule_stats_sync))
+    hass.async_create_task(async_sync_meter_statistics(hass, entry, coordinator))
 
     # Register services
     async def handle_refresh(call):

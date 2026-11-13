@@ -26,6 +26,10 @@ METERS = [
     }
 ]
 INDEX = {"index": 123.456, "timestamp": "2026-10-20T00:00:00"}
+READINGS = [
+    {"date": "2026-10-19", "index": 122.456},
+    {"date": "2026-10-20", "index": 123.456},
+]
 
 
 @pytest.fixture(autouse=True)
@@ -45,6 +49,10 @@ def mock_api():
         patch(
             "custom_components.regiedeseauxmpl.api.RegieDesEauxAPI.async_get_meter_index",
             new=AsyncMock(return_value=INDEX),
+        ),
+        patch(
+            "custom_components.regiedeseauxmpl.api.RegieDesEauxAPI.async_get_meter_readings",
+            new=AsyncMock(return_value=READINGS),
         ),
     ):
         yield

@@ -1,5 +1,6 @@
 """Integration tests: config entry setup on a real Home Assistant core."""
 
+from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, patch
 
 from homeassistant.config_entries import ConfigEntryState
@@ -85,3 +86,42 @@ async def test_setup_from_ui_config_flow(hass, hass_client, mock_api):
     entry = hass.config_entries.async_get_entry(result["result"]["entry_id"])
     assert entry.state is ConfigEntryState.LOADED
     assert len(er.async_entries_for_config_entry(er.async_get(hass), entry.entry_id)) == 1
+
+
+async def test_readings_synced_to_statistics_after_setup(hass, mock_api, config_entry):
+    """After setup, readings are passed to the statistics import at their dates.
+
+    HA timestamps live state changes at request time (not backdatable), so the
+    integration forwards the readings to async_import_statistics with
+    start = consumption day (dateReleve - 1 day).
+    """
+    from custom_components.regiedeseauxmpl.statistics import meter_entity_id
+
+    config_entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    entity_id = meter_entity_id(hass, "C0001")
+    assert entity_id is not None
+
+    with (
+        patch(
+            "custom_components.regiedeseauxmpl.statistics.statistics_during_period",
+            new=AsyncMock(return_value={}),
+        ),
+        patch(
+            "custom_components.regiedeseauxmpl.statistics.async_import_statistics"
+        ) as mock_import,
+    ):
+        from custom_components.regiedeseauxmpl.statistics import async_sync_meter_statistics
+
+        coordinator = hass.data[DOMAIN][config_entry.entry_id]
+        await async_sync_meter_statistics(hass, config_entry, coordinator)
+        await hass.async_block_till_done()
+
+    assert mock_import.call_count == 1
+    metadata, stats = mock_import.call_args.args[1], mock_import.call_args.args[2]
+    assert metadata["statistic_id"] == entity_id
+    # readings 2026-10-19 and 2026-10-20 -> consumption days 2026-10-18/19
+    assert [s["sum"] for s in stats] == [122.456, 123.456]
+    assert [s["start"].date().isoformat() for s in stats] == ["2026-10-18", "2026-10-19"]

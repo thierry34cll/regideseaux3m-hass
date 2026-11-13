@@ -86,11 +86,17 @@ class RegieDesEauxCoordinator(DataUpdateCoordinator[dict]):
         """Fetch data from the API."""
         try:
             meters = await self.api.async_get_meters()
-            data = {"meters": {}, "last_updated": None}
+            data = {"meters": {}, "readings": {}, "last_updated": None}
 
             for meter in meters:
                 meter_id = meter["id"]
-                index_info = await self.api.async_get_meter_index(meter_id)
+                readings = await self.api.async_get_meter_readings(meter_id)
+                data["readings"][meter_id] = readings
+                if readings:
+                    latest = readings[-1]
+                    index_info = {"index": latest["index"], "timestamp": latest["date"]}
+                else:
+                    index_info = {"index": None, "timestamp": None}
                 data["meters"][meter_id] = {
                     **meter,
                     **index_info,

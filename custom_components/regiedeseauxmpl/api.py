@@ -269,19 +269,13 @@ class RegieDesEauxAPI:
             }]
         return meters
 
-    async def async_get_meter_index(self, meter_id: str) -> dict:
-        """Get the latest meter index (m³) via listeConsommationsInstanceAlerteChart.
+    async def _async_fetch_consommations(
+        self, meter_id: str, ts_start: int, ts_end: int
+    ) -> list[dict]:
+        """Fetch the raw consommations list via listeConsommationsInstanceAlerteChart.
 
-        Uses a 365-day look-back window with daily granularity (granularite=1).
-        Returns the most recent 'Réel' entry as {"index": float, "timestamp": str}.
-        ``valeurIndex`` is in litres — divide by 1000 for m³.
+        Uses daily granularity (granularite=1) over the [ts_start, ts_end] window.
         """
-        LOGGER.debug("Fetching index for meter %s", meter_id)
-
-        now = datetime.now(UTC)
-        ts_end = int(now.timestamp())
-        ts_start = int((now - timedelta(days=365)).timestamp())
-
         url = (
             f"{API_ROOT_URL}/Consommation/listeConsommationsInstanceAlerteChart"
             f"/{meter_id}/{ts_start}/{ts_end}/1/true"
@@ -297,16 +291,33 @@ class RegieDesEauxAPI:
                 "listeConsommationsInstanceAlerteChart/%s returned %s",
                 meter_id, resp.status_code,
             )
-            return {"index": None, "timestamp": None}
+            return []
 
         try:
             data = resp.json()
         except ValueError:
             LOGGER.warning("Non-JSON response for meter index %s", meter_id)
-            return {"index": None, "timestamp": None}
+            return []
 
-        consommations = data.get("consommations", [])
-        # Keep only real readings (typeAgregat == "Réel") and pick the latest
+        return data.get("consommations", []) or []
+
+    async def async_get_meter_readings(
+        self, meter_id: str, days: int = 365
+    ) -> list[dict]:
+        """Get the daily real readings for a meter, oldest first.
+
+        Returns a list of {"date": <dateReleve>, "index": <m³>} entries.
+        ``valeurIndex`` is in litres — divided by 1000 for m³.
+        """
+        LOGGER.debug("Fetching readings for meter %s (%s days)", meter_id, days)
+
+        now = datetime.now(UTC)
+        ts_end = int(now.timestamp())
+        ts_start = int((now - timedelta(days=days)).timestamp())
+
+        consommations = await self._async_fetch_consommations(meter_id, ts_start, ts_end)
+
+        # Keep only real readings (typeAgregat == "Réel")
         reels = [
             c for c in consommations
             if c.get("typeAgregat") == "Réel" and c.get("valeurIndex") is not None
@@ -315,13 +326,26 @@ class RegieDesEauxAPI:
             # Fall back to any entry with a valeurIndex
             reels = [c for c in consommations if c.get("valeurIndex") is not None]
 
-        if not reels:
+        readings = []
+        for c in reels:
+            if not c.get("dateReleve"):
+                continue
+            readings.append({
+                "date": str(c["dateReleve"]),
+                "index": round(float(c["valeurIndex"]) / 1000.0, 3),
+            })
+        readings.sort(key=lambda r: r["date"])
+        return readings
+
+    async def async_get_meter_index(self, meter_id: str) -> dict:
+        """Get the latest meter index (m³) as {"index": float, "timestamp": str}."""
+        readings = await self.async_get_meter_readings(meter_id, days=365)
+        if not readings:
             LOGGER.info("No index entries found for meter %s", meter_id)
             return {"index": None, "timestamp": None}
 
-        latest = max(reels, key=lambda c: c.get("dateReleve", ""))
-        index_m3 = round(float(latest["valeurIndex"]) / 1000.0, 3)
+        latest = readings[-1]
         return {
-            "index": index_m3,
-            "timestamp": latest.get("dateReleve"),
+            "index": latest["index"],
+            "timestamp": latest["date"],
         }

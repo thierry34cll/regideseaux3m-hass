@@ -13,11 +13,18 @@ CONF_PASSWORD = "password"
 CONF_METERS = "meters"
 CONF_SCAN_INTERVAL = "scan_interval"  # legacy (config entries v1), migrated to CONF_UPDATE_TIME
 CONF_UPDATE_TIME = "update_time"
+CONF_SMOOTH_CONSUMPTION = "smooth_consumption"
 
 # Default values
 DEFAULT_SCAN_INTERVAL = timedelta(hours=6)  # legacy
 DEFAULT_UPDATE_TIME = "05:00"
+DEFAULT_SMOOTH_CONSUMPTION = False
 DEFAULT_NAME = "Régie des Eaux Montpellier"
+
+# A reading published on day D reflects the consumption of day D-1.
+READING_DATE_OFFSET_DAYS = 1
+# How far back the API is queried for the history import (the server may cap it).
+HISTORY_LOOKBACK_DAYS = 1095  # ~3 years
 
 # Minimum and maximum scan intervals
 MIN_SCAN_INTERVAL = timedelta(minutes=30)

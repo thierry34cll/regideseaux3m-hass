@@ -52,6 +52,11 @@ HA_MODULES = [
     "homeassistant.components",
     "homeassistant.components.sensor",
     "homeassistant.components.diagnostics",
+    "homeassistant.components.recorder",
+    "homeassistant.components.recorder.core",
+    "homeassistant.components.recorder.models",
+    "homeassistant.components.recorder.models.statistics",
+    "homeassistant.components.recorder.statistics",
     
     # Util
     "homeassistant.util",
@@ -213,6 +218,15 @@ class MockDtUtil:
     def parse_date(*args, **kwargs):
         from datetime import date
         return date.today()
+
+    @staticmethod
+    def start_of_local_day(dt):
+        """Tests run in UTC: local day start == the datetime itself (UTC-aware)."""
+        from datetime import timezone
+        if dt.tzinfo is None:
+            from datetime import datetime as _dt
+            dt = _dt.combine(dt.date(), dt.time(), tzinfo=timezone.utc)
+        return dt
 
 
 # Mock async_get_clientsession
