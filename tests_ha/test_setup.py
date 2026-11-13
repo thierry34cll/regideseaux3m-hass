@@ -87,21 +87,18 @@ async def test_setup_from_ui_config_flow(hass, hass_client, mock_api):
     assert len(er.async_entries_for_config_entry(er.async_get(hass), entry.entry_id)) == 1
 
 
-async def test_readings_synced_to_statistics_after_setup(hass, mock_api, config_entry):
-    """After setup, readings are passed to the statistics import at their dates.
+async def test_readings_synced_to_external_statistics(hass, mock_api, config_entry):
+    """Readings are written as a dated EXTERNAL statistic (regiedeseauxmpl:C0001).
 
-    HA timestamps live state changes at request time (not backdatable), so the
-    integration forwards the readings to async_import_statistics with
-    start = consumption day (dateReleve - 1 day).
+    The real async_add_external_statistics validation runs (only the recorder
+    queue call is mocked), proving the metadata passes HA's checks
+    (statistic_id format, source == domain, mean_type/unit_class present).
     """
-    from custom_components.regiedeseauxmpl.statistics import meter_entity_id
+    from custom_components.regiedeseauxmpl.statistics import async_sync_meter_statistics
 
     config_entry.add_to_hass(hass)
     assert await hass.config_entries.async_setup(config_entry.entry_id)
     await hass.async_block_till_done()
-
-    entity_id = meter_entity_id(hass, "C0001")
-    assert entity_id is not None
 
     with (
         patch(
@@ -109,20 +106,21 @@ async def test_readings_synced_to_statistics_after_setup(hass, mock_api, config_
             new=AsyncMock(return_value={}),
         ),
         patch(
-            "custom_components.regiedeseauxmpl.statistics.async_import_statistics"
-        ) as mock_import,
+            "homeassistant.components.recorder.statistics._async_import_statistics"
+        ) as mock_queue,
     ):
-        from custom_components.regiedeseauxmpl.statistics import (
-            async_sync_meter_statistics,
-        )
-
         coordinator = hass.data[DOMAIN][config_entry.entry_id]
         await async_sync_meter_statistics(hass, config_entry, coordinator)
         await hass.async_block_till_done()
 
-    assert mock_import.call_count == 1
-    metadata, stats = mock_import.call_args.args[1], mock_import.call_args.args[2]
-    assert metadata["statistic_id"] == entity_id
+    assert mock_queue.call_count == 1
+    metadata, stats = mock_queue.call_args.args[1], mock_queue.call_args.args[2]
+    assert metadata["statistic_id"] == f"{DOMAIN}:c0001"  # slugified meter id
+    assert metadata["source"] == DOMAIN
+    assert "mean_type" in metadata  # required since HA 2026.11
+    assert metadata["unit_class"] == "volume"
+    assert metadata["unit_of_measurement"] == "m³"
+    assert metadata["has_sum"] is True
     # readings 2026-10-19 and 2026-10-20 -> consumption days 2026-10-18/19
     assert [s["sum"] for s in stats] == [122.456, 123.456]
     assert [s["start"].date().isoformat() for s in stats] == ["2026-10-18", "2026-10-19"]
@@ -137,10 +135,7 @@ async def test_smooth_consumption_spreads_gap(hass, mock_api):
         CONF_SMOOTH_CONSUMPTION,
         CONF_USERNAME,
     )
-    from custom_components.regiedeseauxmpl.statistics import (
-        async_sync_meter_statistics,
-        meter_entity_id,
-    )
+    from custom_components.regiedeseauxmpl.statistics import async_sync_meter_statistics
 
     entry = MockConfigEntry(
         domain=DOMAIN,
@@ -162,22 +157,21 @@ async def test_smooth_consumption_spreads_gap(hass, mock_api):
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
 
-    entity_id = meter_entity_id(hass, "C0001")
     with (
         patch(
             "custom_components.regiedeseauxmpl.statistics.statistics_during_period",
             new=AsyncMock(return_value={}),
         ),
         patch(
-            "custom_components.regiedeseauxmpl.statistics.async_import_statistics"
-        ) as mock_import,
+            "homeassistant.components.recorder.statistics._async_import_statistics"
+        ) as mock_queue,
     ):
         coordinator = hass.data[DOMAIN][entry.entry_id]
         await async_sync_meter_statistics(hass, entry, coordinator)
         await hass.async_block_till_done()
 
-    assert mock_import.call_count == 1
-    stats = mock_import.call_args.args[2]
+    assert mock_queue.call_count == 1
+    stats = mock_queue.call_args.args[2]
     # consumption days 10-18 (122.0) then 10-19..10-21 spread of 1 m³
     assert [s["start"].date().isoformat() for s in stats] == [
         "2026-10-18", "2026-10-19", "2026-10-20", "2026-10-21",
@@ -187,12 +181,10 @@ async def test_smooth_consumption_spreads_gap(hass, mock_api):
 
 async def test_history_import_wiring_and_once_guard(hass, mock_api, config_entry):
     """Point 4: setup schedules the one-time history import; the import itself
-    fetches all available online data (wide window) and runs only once."""
+    fetches all available online data (wide window) and runs only once per
+    meter (persistent guard keyed by statistic_id)."""
     from custom_components.regiedeseauxmpl.const import HISTORY_LOOKBACK_DAYS
-    from custom_components.regiedeseauxmpl.statistics import (
-        async_import_history,
-        meter_entity_id,
-    )
+    from custom_components.regiedeseauxmpl.statistics import async_import_history
 
     # 1) wiring: setup schedules async_import_history
     with patch(
@@ -203,32 +195,31 @@ async def test_history_import_wiring_and_once_guard(hass, mock_api, config_entry
         await hass.async_block_till_done()
         assert mock_hist.call_count == 1
 
-    # 2) real import: wide window + idempotent (guard via storage flag)
-    entity_id = meter_entity_id(hass, "C0001")
-    coordinator = hass.data[DOMAIN][config_entry.entry_id]
+    # 2) real import: wide window + idempotent (guard via storage, per statistic_id)
     with (
         patch(
             "custom_components.regiedeseauxmpl.statistics.statistics_during_period",
             new=AsyncMock(return_value={}),
         ),
         patch(
-            "custom_components.regiedeseauxmpl.statistics.async_import_statistics"
-        ) as mock_import,
+            "homeassistant.components.recorder.statistics._async_import_statistics"
+        ) as mock_queue,
     ):
+        coordinator = hass.data[DOMAIN][config_entry.entry_id]
         await async_import_history(hass, config_entry, coordinator)
         await hass.async_block_till_done()
-        assert mock_import.call_count == 1
+        assert mock_queue.call_count == 1
         call = coordinator.api.async_get_meter_readings.call_args
         assert HISTORY_LOOKBACK_DAYS in (call.kwargs.get("days"), *call.args)
 
         # second call: persistent guard -> nothing re-imported
         await async_import_history(hass, config_entry, coordinator)
         await hass.async_block_till_done()
-        assert mock_import.call_count == 1
+        assert mock_queue.call_count == 1
 
 
 async def test_history_import_overwrite_clears_first(hass, mock_api):
-    """Point 4 overwrite mode: existing statistics are cleared through the
+    """Point 4 overwrite mode: the external statistic is cleared through the
     recorder API (same path as the UI delete button) before re-importing."""
     from pytest_homeassistant_custom_component.common import MockConfigEntry
 
@@ -237,10 +228,7 @@ async def test_history_import_overwrite_clears_first(hass, mock_api):
         CONF_PASSWORD,
         CONF_USERNAME,
     )
-    from custom_components.regiedeseauxmpl.statistics import (
-        async_import_history,
-        meter_entity_id,
-    )
+    from custom_components.regiedeseauxmpl.statistics import async_import_history
 
     entry = MockConfigEntry(
         domain=DOMAIN,
@@ -259,22 +247,21 @@ async def test_history_import_overwrite_clears_first(hass, mock_api):
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
 
-    entity_id = meter_entity_id(hass, "C0001")
-    coordinator = hass.data[DOMAIN][entry.entry_id]
     with (
         patch(
             "custom_components.regiedeseauxmpl.statistics.statistics_during_period",
             new=AsyncMock(return_value={}),
         ),
         patch(
-            "custom_components.regiedeseauxmpl.statistics.async_import_statistics"
-        ) as mock_import,
+            "homeassistant.components.recorder.statistics._async_import_statistics"
+        ) as mock_queue,
         patch(
             "custom_components.regiedeseauxmpl.statistics.async_clear_statistics"
         ) as mock_clear,
     ):
+        coordinator = hass.data[DOMAIN][entry.entry_id]
         await async_import_history(hass, entry, coordinator)
         await hass.async_block_till_done()
 
-    mock_clear.assert_called_once_with(hass, entity_id)
-    assert mock_import.call_count == 1
+    mock_clear.assert_called_once_with(hass, "C0001")
+    assert mock_queue.call_count == 1

@@ -1,15 +1,19 @@
-"""Import water-meter readings into Home Assistant statistics.
+"""Import water-meter readings as external Home Assistant statistics.
 
 Each reading from the Régie carries the date it was taken (``dateReleve``).
 The utility publishes the previous day's reading overnight, so a reading
-dated D is attributed to the consumption of day D - READING_DATE_OFFSET_DAYS.
+dated D is attributed to the consumption of day D - READING_DATE_OFFSET_DAYS
+(assumption to verify against a real API response).
 
 HA always timestamps live state changes at request time, which cannot be
-backdated, so dated readings are written to the recorder statistics with
-``async_import_statistics`` — this is what the Energy dashboard uses.
+backdated, and the water sensor is TOTAL_INCREASING (HA already computes its
+own sums from the states). So readings are written as a **separate external
+statistic** ``regiedeseauxmpl:<meter_id>`` via ``async_add_external_statistics``
+— the user then selects it in the Energy dashboard (Eau / Water). The
+sensor's own statistics are left untouched.
 
-All writes go through the recorder's own APIs (``async_import_statistics`` /
-``Recorder.async_clear_statistics``), never through direct database access.
+All writes go through the recorder's own APIs (``async_add_external_statistics``
+/ ``Recorder.async_clear_statistics``), never through direct database access.
 """
 from __future__ import annotations
 
@@ -18,18 +22,19 @@ from datetime import UTC, date, datetime, time, timedelta
 from homeassistant.components.recorder import get_instance
 from homeassistant.components.recorder.models.statistics import (
     StatisticData,
+    StatisticMeanType,
     StatisticMetaData,
 )
 from homeassistant.components.recorder.statistics import (
-    async_import_statistics,
+    async_add_external_statistics,
     statistics_during_period,
 )
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import UnitOfVolume
+from homeassistant.const import VOLUME, UnitOfVolume
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.entity_registry import async_get as async_get_entity_registry
 from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
+from homeassistant.util import slugify
 
 from .const import (
     CONF_OVERWRITE_HISTORY,
@@ -43,6 +48,15 @@ from .const import (
     STORAGE_KEY_HISTORY,
 )
 from .coordinator import RegieDesEauxCoordinator
+
+
+def external_statistic_id(meter_id: str) -> str:
+    """External statistic id for a meter: "<domain>:<slugified meter_id>".
+
+    The object part must be a valid entity-id-like slug (lowercase), hence
+    the slugify — contract ids like "C0001" would be rejected by HA.
+    """
+    return f"{DOMAIN}:{slugify(meter_id)}"
 
 
 def consumption_date(reading_date: str) -> date:
@@ -80,36 +94,19 @@ def compute_daily_rows(
     return sorted(rows.items())
 
 
-def meter_entity_id(hass: HomeAssistant, meter_id: str) -> str | None:
-    """Return the sensor entity_id for a meter (unique_id = f"{DOMAIN}_{meter_id}")."""
-    registry = async_get_entity_registry(hass)
-    return registry.async_get_entity_id("sensor", DOMAIN, f"{DOMAIN}_{meter_id}")
-
-
-async def _wait_for_entity_id(hass: HomeAssistant, meter_id: str, tries: int = 50) -> str | None:
-    """Wait (yielding to the loop, never block_till_done) for the sensor to register."""
-    import asyncio
-
-    for _ in range(tries):
-        entity_id = meter_entity_id(hass, meter_id)
-        if entity_id:
-            return entity_id
-        await asyncio.sleep(0)
-    return None
-
-
 async def async_import_readings(
     hass: HomeAssistant,
-    statistic_id: str,
+    meter_id: str,
     name: str,
     readings: list[dict],
     smooth: bool = False,
 ) -> int:
-    """Import readings as daily statistics, skipping days that already exist.
+    """Import readings as daily external statistics, skipping existing days.
 
-    Returns the number of rows actually imported (idempotent: existing
-    statistics for the same statistic_id and day are never duplicated).
+    Returns the number of rows actually imported (idempotent: days that
+    already have statistics for this statistic_id are never re-imported).
     """
+    statistic_id = external_statistic_id(meter_id)
     rows = compute_daily_rows(readings, smooth)
     if not rows:
         return 0
@@ -130,6 +127,7 @@ async def async_import_readings(
         units=None,
         types={"sum"},
     )
+    # StatisticsRow["start"] is a unix timestamp (float), not a datetime.
     existing_starts = {row["start"] for row in existing.get(statistic_id, [])}
 
     stats = []
@@ -137,7 +135,7 @@ async def async_import_readings(
         start = dt_util.start_of_local_day(
             datetime.combine(day, time.min)
         ).astimezone(UTC)
-        if start in existing_starts:
+        if start.timestamp() in existing_starts:
             continue
         stats.append(StatisticData(start=start, state=cumulative, sum=cumulative))
 
@@ -148,16 +146,20 @@ async def async_import_readings(
         statistic_id=statistic_id,
         source=DOMAIN,
         unit_of_measurement=UnitOfVolume.CUBIC_METERS,
+        unit_class=VOLUME,
         has_mean=False,
         has_sum=True,
+        mean_type=StatisticMeanType.NONE,
         name=name,
     )
-    async_import_statistics(hass, metadata, stats)
+    # async_add_external_statistics validates statistic_id/source and the
+    # presence of mean_type/unit_class (required since HA 2026.11).
+    async_add_external_statistics(hass, metadata, stats)
     return len(stats)
 
 
-def async_clear_statistics(hass: HomeAssistant, statistic_id: str) -> None:
-    """Clear all statistics for a statistic_id.
+def async_clear_statistics(hass: HomeAssistant, meter_id: str) -> None:
+    """Clear all statistics of the external statistic for a meter.
 
     Uses the recorder's own queued job — the same code path as the
     "delete" button in Developer tools > Statistics.
@@ -165,15 +167,15 @@ def async_clear_statistics(hass: HomeAssistant, statistic_id: str) -> None:
     try:
         instance = get_instance(hass)
     except Exception:  # noqa: BLE001 — recorder may not be running
-        LOGGER.warning("Recorder not available, cannot clear %s", statistic_id)
+        LOGGER.warning("Recorder not available, cannot clear %s", meter_id)
         return
-    instance.async_clear_statistics([statistic_id])
+    instance.async_clear_statistics([external_statistic_id(meter_id)])
 
 
 async def async_sync_meter_statistics(
     hass: HomeAssistant, entry: ConfigEntry, coordinator: RegieDesEauxCoordinator
 ) -> None:
-    """Import any new readings of every meter as dated statistics."""
+    """Import any new readings of every meter as dated external statistics."""
     smooth = bool(
         entry.options.get(
             CONF_SMOOTH_CONSUMPTION,
@@ -182,21 +184,23 @@ async def async_sync_meter_statistics(
     )
     readings_map = coordinator.data.get("readings", {})
     for meter_id, meter in coordinator.data.get("meters", {}).items():
-        entity_id = await _wait_for_entity_id(hass, meter_id)
-        if not entity_id:
-            LOGGER.debug("No entity yet for meter %s, skipping statistics", meter_id)
-            continue
         readings = readings_map.get(meter_id) or []
         try:
             imported = await async_import_readings(
-                hass, entity_id, meter.get("name") or meter_id, readings, smooth
+                hass, meter_id, meter.get("name") or meter_id, readings, smooth
             )
             if imported:
                 LOGGER.info(
-                    "Imported %d dated statistics rows for %s", imported, entity_id
+                    "Imported %d dated statistics rows for %s",
+                    imported,
+                    external_statistic_id(meter_id),
                 )
         except Exception as err:  # noqa: BLE001 — statistics must never break polling
-            LOGGER.warning("Could not import statistics for %s: %s", entity_id, err)
+            LOGGER.warning(
+                "Could not import statistics for %s: %s",
+                external_statistic_id(meter_id),
+                err,
+            )
 
 
 async def async_import_history(
@@ -205,19 +209,17 @@ async def async_import_history(
     """One-time import of all readings available online (install option).
 
     Guards against duplicates/re-runs:
-    - runs only once per config entry (persistent flag in HA storage), so a
-      reinstall on the same HA instance does not re-import;
+    - the "imported" flag is stored per statistic_id (stable across
+      reinstalls, unlike the config entry id), and only for meters that were
+      actually processed;
     - async_import_readings never duplicates a day that already has
       statistics, so even a lost flag only fills the gaps;
-    - with the "overwrite" option, existing statistics and states of the
-      sensors are cleared first — through the recorder APIs only (the same
-      code path as the Developer tools UI), never direct DB access.
+    - with the "overwrite" option, the external statistic of each meter is
+      cleared first — through the recorder API only, never direct DB access.
+      (The sensor's own history can be purged manually in Developer tools.)
     """
     store = Store(hass, 1, STORAGE_KEY_HISTORY)
     done = await store.async_load() or {}
-    if done.get(entry.entry_id):
-        LOGGER.debug("History already imported for entry %s, skipping", entry.entry_id)
-        return
 
     overwrite = bool(
         entry.options.get(CONF_OVERWRITE_HISTORY)
@@ -231,35 +233,26 @@ async def async_import_history(
     )
 
     for meter_id, meter in coordinator.data.get("meters", {}).items():
-        entity_id = await _wait_for_entity_id(hass, meter_id)
-        if not entity_id:
-            LOGGER.debug("No entity yet for meter %s, skipping history", meter_id)
+        statistic_id = external_statistic_id(meter_id)
+        if done.get(statistic_id):
+            LOGGER.debug("History already imported for %s, skipping", statistic_id)
             continue
         try:
             if overwrite:
-                LOGGER.info("Overwrite: clearing existing statistics for %s", entity_id)
-                async_clear_statistics(hass, entity_id)
-                try:
-                    await hass.services.async_call(
-                        "recorder",
-                        "purge_entities",
-                        {"entity_id": [entity_id]},
-                        blocking=True,
-                    )
-                except Exception as err:  # noqa: BLE001
-                    LOGGER.warning("Could not purge states for %s: %s", entity_id, err)
+                LOGGER.info("Overwrite: clearing existing statistics for %s", statistic_id)
+                async_clear_statistics(hass, meter_id)
 
             readings = await coordinator.api.async_get_meter_readings(
                 meter_id, days=HISTORY_LOOKBACK_DAYS
             )
             imported = await async_import_readings(
-                hass, entity_id, meter.get("name") or meter_id, readings, smooth
+                hass, meter_id, meter.get("name") or meter_id, readings, smooth
             )
             LOGGER.info(
                 "History import for %s: %d readings over %d days -> %d statistics rows",
-                entity_id, len(readings), HISTORY_LOOKBACK_DAYS, imported,
+                statistic_id, len(readings), HISTORY_LOOKBACK_DAYS, imported,
             )
+            done[statistic_id] = True
+            await store.async_save(done)  # flag only this processed meter
         except Exception as err:  # noqa: BLE001 — history must never break setup
-            LOGGER.warning("History import failed for %s: %s", entity_id, err)
-
-    await store.async_save({**done, entry.entry_id: True})
+            LOGGER.warning("History import failed for %s: %s", statistic_id, err)

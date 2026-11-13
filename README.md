@@ -173,7 +173,9 @@ Cette intégration utilise **l'API interne** (découverte par reverse engineerin
    - **Mot de passe** : Votre mot de passe de l'agence en ligne
    - **Heure de relevé quotidienne** : heure du rafraîchissement (par défaut : `05:00`). La Régie ne publie l'index qu'une fois par jour, dans la nuit : un relevé quotidien à heure fixe suffit
    - **Récupérer l'historique disponible en ligne** (coché par défaut) : importe une seule fois tout l'historique de consommation renvoyé par la Régie, en l'attribuant à la **date réelle de consommation** (veille du relevé)
-   - **Écraser les données existantes avant l'import** (décoché par défaut) : efface d'abord les statistiques/états actuels du capteur (via les API du recorder, comme le bouton supprimer de l'interface) avant de réimporter proprement
+   - **Écraser les données existantes avant l'import** (décoché par défaut) : efface d'abord la statistique importée avant de la réimporter (via les API du recorder uniquement)
+
+> 💡 Les consommations datées sont écrites dans une **statistique externe** `regiedeseauxmpl:<compteur>` (et non dans les statistiques du capteur lui-même, que HA calcule déjà). Pour les voir dans le tableau de bord : **Paramètres → Tableaux de bord → Énergie → Eau → « Ajouter une source »** → choisir `regiedeseauxmpl:<compteur>`.
 
 3. **Validez**
    - Cliquez sur **"Soumettre"**

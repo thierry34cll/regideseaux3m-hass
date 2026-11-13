@@ -11,7 +11,7 @@ et ce projet adhère à [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Ajouté
 - **Relevé quotidien à heure fixe** (champ « Heure de relevé quotidienne », défaut `05:00`, à l'installation et dans les options) à la place de l'intervalle glissant : l'heure de relevé ne dépend plus du dernier redémarrage de HA
-- **Attribution des relevés à leur date réelle de consommation** : les relevés (qui portent `dateReleve` côté API) sont importés dans les statistiques du recorder à la veille du relevé, via `async_import_statistics` (HA ne permet pas d'antidater un état)
+- **Attribution des relevés à leur date réelle de consommation** : les relevés (qui portent `dateReleve` côté API) sont écrits comme **statistique externe** `regiedeseauxmpl:<compteur>` (à sélectionner dans Énergie → Eau) via `async_add_external_statistics`, à la veille du relevé — HA ne permet pas d'antidater un état, et le capteur TOTAL_INCREASING a déjà ses propres statistiques
 - **Option de lissage** (« Lisser la consommation sur les jours sans relevé ») : répartit la consommation cumulée d'un relevé sur les jours sans relevé (ex. 1 m³ après 3 jours → ~0,33 m³/jour)
 - **Import de l'historique à l'installation** (option cochée par défaut, fenêtre large demandée à l'API) + option « écraser les données existantes » (purge via les API recorder uniquement, jamais d'accès direct à la base). Gardes-fous : exécution unique par entrée (flag persistant) et import idempotent (les jours déjà présents en statistiques ne sont jamais réimportés)
 - Support multi-compteurs avec gestion individuelle
