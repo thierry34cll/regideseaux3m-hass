@@ -111,24 +111,22 @@ async def test_import_readings_skips_existing_days():
             hass, "C0001", "Compteur", readings, smooth=False
         )
 
-    # baseline row (11-01, same sum as first reading) + the new 11-03 row;
-    # the 11-02 row already exists and is skipped
-    assert imported == 2
+    # relative sums (base = first reading 100.0): only the new 11-03 row,
+    # with sum = 101.0 - 100.0 = 1.0; the 11-02 row already exists
+    assert imported == 1
     assert mock_import.call_count == 1
     metadata, stats = mock_import.call_args.args[1], mock_import.call_args.args[2]
     # external statistic, source aligned with the statistic_id domain
     assert metadata.statistic_id == "regiedeseauxmpl:c0001"
     assert metadata.source == "regiedeseauxmpl"
     assert [(st.start, st.sum) for st in stats] == [
-        (datetime(2026, 11, 1, tzinfo=UTC), 100.0),
-        (datetime(2026, 11, 3, tzinfo=UTC), 101.0),
+        (datetime(2026, 11, 3, tzinfo=UTC), 1.0),
     ]
 
 
 @pytest.mark.asyncio
 async def test_import_readings_nothing_new():
-    """When the reading day already exists, only the baseline row (day before
-    the first reading) may still be missing and gets imported alone."""
+    """When everything already exists, no import call is made."""
     hass = MagicMock()
     readings = [{"date": "2026-11-02", "index": 100.0}]
     with (
@@ -152,10 +150,8 @@ async def test_import_readings_nothing_new():
             hass, "C0001", "Compteur", readings, smooth=False
         )
 
-    assert imported == 1  # only the baseline row (11-01) is missing
-    stats = mock_import.call_args.args[2]
-    assert stats[0].start == datetime(2026, 11, 1, tzinfo=UTC)
-    assert stats[0].sum == 100.0
+    assert imported == 0
+    mock_import.assert_not_called()
 
 
 @pytest.mark.asyncio

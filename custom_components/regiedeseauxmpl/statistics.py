@@ -15,6 +15,11 @@ sensor's own statistics are left untouched.
 All reads/writes go through the recorder's own APIs, never direct DB access.
 Note: ``statistics_during_period`` is a *sync* DB function, so it must be
 called via ``Recorder.async_add_executor_job`` (never awaited directly).
+
+Sums are written RELATIVE to the first imported reading (index - base): the
+Energy dashboard only uses day-to-day deltas, so this changes nothing there,
+but avoids the classic "first row of a fresh statistic is counted as one
+day's consumption" spike (the full ~300 m³ index on a single day).
 """
 from __future__ import annotations
 
@@ -126,6 +131,27 @@ async def _existing_start_timestamps(
     return {row["start"] for row in rows.get(statistic_id, [])}
 
 
+async def _load_bases(hass: HomeAssistant) -> dict:
+    """Load the per-statistic zero-point bases from storage (best effort)."""
+    try:
+        store = Store(hass, 1, STORAGE_KEY_HISTORY)
+        data = await store.async_load() or {}
+        return data.get("base", {})
+    except Exception:  # noqa: BLE001 — never break the import over the base
+        return {}
+
+
+async def _save_base(hass: HomeAssistant, statistic_id: str, base: float) -> None:
+    """Persist the zero-point base of a statistic (best effort)."""
+    try:
+        store = Store(hass, 1, STORAGE_KEY_HISTORY)
+        data = await store.async_load() or {}
+        data.setdefault("base", {})[statistic_id] = base
+        await store.async_save(data)
+    except Exception:  # noqa: BLE001
+        LOGGER.debug("Could not persist base for %s", statistic_id)
+
+
 async def async_import_readings(
     hass: HomeAssistant,
     meter_id: str,
@@ -143,11 +169,15 @@ async def async_import_readings(
     if not rows:
         return 0
 
-    # Baseline row the day BEFORE the first reading, with the same cumulative
-    # value: without it, HA treats the first row's "sum" as a one-off
-    # consumption (e.g. the full 300 m³ index shown on a single day).
-    first_day, first_cumulative = rows[0]
-    rows = [(first_day - timedelta(days=1), first_cumulative)] + rows
+    # Relative sums: the first imported reading defines the zero point, so
+    # the first row's sum is 0 and HA never counts the whole meter index as
+    # one day's consumption. The base is persisted per statistic_id so later
+    # imports stay on the same scale.
+    bases = await _load_bases(hass)
+    base = bases.get(statistic_id)
+    if base is None:
+        base = rows[0][1]
+        await _save_base(hass, statistic_id, base)
 
     first_start = dt_util.start_of_local_day(
         datetime.combine(rows[0][0], time.min)
@@ -167,7 +197,8 @@ async def async_import_readings(
         ).astimezone(UTC)
         if start.timestamp() in existing_starts:
             continue
-        stats.append(StatisticData(start=start, state=cumulative, sum=cumulative))
+        rel = round(cumulative - base, 6)
+        stats.append(StatisticData(start=start, state=rel, sum=rel))
 
     if not stats:
         return 0
