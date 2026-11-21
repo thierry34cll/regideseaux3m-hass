@@ -9,7 +9,7 @@
                     "password": "Mot de passe",
                     "update_time": "Heure de relevé quotidienne",
                     "import_history": "Récupérer l'historique de consommation disponible en ligne",
-                    "overwrite_history": "Écraser les données existantes avant l'import (efface les statistiques/états actuels du capteur)"
+                    "overwrite_history": "Écraser la statistique importée avant de la réimporter (via les API du recorder ; l'historique du capteur se purge manuellement dans Outils de développement)"
                 }
             }
         },

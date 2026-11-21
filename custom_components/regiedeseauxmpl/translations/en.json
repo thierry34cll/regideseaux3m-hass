@@ -9,7 +9,7 @@
                     "password": "Password",
                     "update_time": "Daily reading time",
                     "import_history": "Import all consumption history available online",
-                    "overwrite_history": "Overwrite existing data before import (clears current sensor statistics/states)"
+                    "overwrite_history": "Overwrite the imported statistic before re-importing (recorder APIs only; sensor history is purged manually in Developer tools)"
                 }
             }
         },
