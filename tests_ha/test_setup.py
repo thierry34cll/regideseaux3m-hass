@@ -121,12 +121,12 @@ async def test_readings_synced_to_external_statistics(hass, mock_api, config_ent
     assert metadata["unit_class"] == "volume"
     assert metadata["unit_of_measurement"] == "m³"
     assert metadata["has_sum"] is True
-    # readings 2026-10-19/20 -> consumption days 2026-10-18/19, plus a
-    # baseline row on 2026-10-17 (same sum as the first reading) so HA does
+    # readings 2026-10-19/20 -> consumption days 2026-10-19/20, plus a
+    # baseline row on 2026-10-18 (same sum as the first reading) so HA does
     # not count the whole cumulative index as one day's consumption
     assert [s["sum"] for s in stats] == [122.456, 122.456, 123.456]
     assert [s["start"].date().isoformat() for s in stats] == [
-        "2026-10-17", "2026-10-18", "2026-10-19",
+        "2026-10-18", "2026-10-19", "2026-10-20",
     ]
 
 
@@ -176,10 +176,10 @@ async def test_smooth_consumption_spreads_gap(hass, mock_api):
 
     assert mock_queue.call_count == 1
     stats = mock_queue.call_args.args[2]
-    # baseline 10-17 (122.0), then consumption days 10-18 (122.0) and the
-    # 10-19..10-21 spread of 1 m³
+    # baseline 10-18 (122.0), then consumption days 10-19 (122.0) and the
+    # 10-20..10-22 spread of 1 m³
     assert [s["start"].date().isoformat() for s in stats] == [
-        "2026-10-17", "2026-10-18", "2026-10-19", "2026-10-20", "2026-10-21",
+        "2026-10-18", "2026-10-19", "2026-10-20", "2026-10-21", "2026-10-22",
     ]
     assert [round(s["sum"], 3) for s in stats] == [122.0, 122.0, 122.333, 122.667, 123.0]
 

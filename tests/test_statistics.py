@@ -22,18 +22,18 @@ READINGS = [
 
 
 def test_consumption_date_offset():
-    """A reading published on day D is the consumption of day D-1."""
-    assert READING_DATE_OFFSET_DAYS == 1
-    assert consumption_date("2026-11-06") == date(2026, 11, 5)
+    """dateReleve is the consumption day itself (verified vs Régie website)."""
+    assert READING_DATE_OFFSET_DAYS == 0
+    assert consumption_date("2026-11-06") == date(2026, 11, 6)
 
 
 def test_compute_daily_rows_without_smoothing():
     """One row per reading, on its consumption day, cumulative sum."""
     rows = compute_daily_rows(READINGS, smooth=False)
     assert rows == [
-        (date(2026, 11, 1), 100.0),
-        (date(2026, 11, 2), 101.0),
-        (date(2026, 11, 5), 102.0),
+        (date(2026, 11, 2), 100.0),
+        (date(2026, 11, 3), 101.0),
+        (date(2026, 11, 6), 102.0),
     ]
 
 
@@ -41,11 +41,11 @@ def test_compute_daily_rows_with_smoothing():
     """A 1 m³ delta appearing after a 3-day gap is spread over the 3 days."""
     rows = compute_daily_rows(READINGS, smooth=True)
     assert rows == [
-        (date(2026, 11, 1), 100.0),
-        (date(2026, 11, 2), 101.0),
-        (date(2026, 11, 3), round(101.0 + 1 / 3, 6)),
-        (date(2026, 11, 4), round(101.0 + 2 / 3, 6)),
-        (date(2026, 11, 5), 102.0),
+        (date(2026, 11, 2), 100.0),
+        (date(2026, 11, 3), 101.0),
+        (date(2026, 11, 4), round(101.0 + 1 / 3, 6)),
+        (date(2026, 11, 5), round(101.0 + 2 / 3, 6)),
+        (date(2026, 11, 6), 102.0),
     ]
 
 
@@ -56,14 +56,14 @@ def test_compute_daily_rows_user_example():
         {"date": "2026-11-06", "index": 51.0},
     ]
     rows = compute_daily_rows(readings, smooth=True)
-    # consumption days: Nov 1 (reading Nov 2), then gap Nov 2 -> Nov 5 = 4 days? no:
-    # gap between consumption days 11-01 and 11-05 is 4 days -> 0.25/day
+    # consumption days are the reading dates: 11-02 then 11-06, gap of 4 days
+    # -> 1 m3 spread as 0.25/day over 11-03..11-06
     assert rows == [
-        (date(2026, 11, 1), 50.0),
-        (date(2026, 11, 2), 50.25),
-        (date(2026, 11, 3), 50.5),
-        (date(2026, 11, 4), 50.75),
-        (date(2026, 11, 5), 51.0),
+        (date(2026, 11, 2), 50.0),
+        (date(2026, 11, 3), 50.25),
+        (date(2026, 11, 4), 50.5),
+        (date(2026, 11, 5), 50.75),
+        (date(2026, 11, 6), 51.0),
     ]
 
 
@@ -82,7 +82,7 @@ async def test_import_readings_skips_existing_days():
         {"date": "2026-11-02", "index": 100.0},
         {"date": "2026-11-03", "index": 101.0},
     ]
-    existing_start = datetime(2026, 11, 1, tzinfo=UTC).timestamp()  # consumption day of 11-02
+    existing_start = datetime(2026, 11, 2, tzinfo=UTC).timestamp()  # consumption day of reading 11-02
 
     from types import SimpleNamespace
 
@@ -111,8 +111,8 @@ async def test_import_readings_skips_existing_days():
             hass, "C0001", "Compteur", readings, smooth=False
         )
 
-    # baseline row (10-31, same sum as first reading) + the new 11-02 row;
-    # the 11-01 row already exists and is skipped
+    # baseline row (11-01, same sum as first reading) + the new 11-03 row;
+    # the 11-02 row already exists and is skipped
     assert imported == 2
     assert mock_import.call_count == 1
     metadata, stats = mock_import.call_args.args[1], mock_import.call_args.args[2]
@@ -120,8 +120,8 @@ async def test_import_readings_skips_existing_days():
     assert metadata.statistic_id == "regiedeseauxmpl:c0001"
     assert metadata.source == "regiedeseauxmpl"
     assert [(st.start, st.sum) for st in stats] == [
-        (datetime(2026, 10, 31, tzinfo=UTC), 100.0),
-        (datetime(2026, 11, 2, tzinfo=UTC), 101.0),
+        (datetime(2026, 11, 1, tzinfo=UTC), 100.0),
+        (datetime(2026, 11, 3, tzinfo=UTC), 101.0),
     ]
 
 
@@ -134,7 +134,7 @@ async def test_import_readings_nothing_new():
     with (
         patch(
             "custom_components.regiedeseauxmpl.statistics._existing_start_timestamps",
-            new=AsyncMock(return_value={datetime(2026, 11, 1, tzinfo=UTC).timestamp()}),
+            new=AsyncMock(return_value={datetime(2026, 11, 2, tzinfo=UTC).timestamp()}),
         ),
         patch(
             "custom_components.regiedeseauxmpl.statistics.slugify",
@@ -152,9 +152,9 @@ async def test_import_readings_nothing_new():
             hass, "C0001", "Compteur", readings, smooth=False
         )
 
-    assert imported == 1  # only the baseline row (10-31) is missing
+    assert imported == 1  # only the baseline row (11-01) is missing
     stats = mock_import.call_args.args[2]
-    assert stats[0].start == datetime(2026, 10, 31, tzinfo=UTC)
+    assert stats[0].start == datetime(2026, 11, 1, tzinfo=UTC)
     assert stats[0].sum == 100.0
 
 

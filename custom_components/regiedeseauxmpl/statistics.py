@@ -1,9 +1,9 @@
 """Import water-meter readings as external Home Assistant statistics.
 
 Each reading from the Régie carries the date it was taken (``dateReleve``).
-The utility publishes the previous day's reading overnight, so a reading
-dated D is attributed to the consumption of day D - READING_DATE_OFFSET_DAYS
-(assumption to verify against a real API response).
+The reading dated D (``dateReleve``) is attributed to the consumption of
+that same day D (READING_DATE_OFFSET_DAYS = 0, verified against the Régie
+des Eaux website which labels the same dates).
 
 HA always timestamps live state changes at request time, which cannot be
 backdated, and the water sensor is TOTAL_INCREASING (HA already computes its
@@ -65,7 +65,7 @@ def external_statistic_id(meter_id: str) -> str:
 
 
 def consumption_date(reading_date: str) -> date:
-    """Return the consumption day for a reading date (published D = consumed D-1)."""
+    """Return the consumption day for a reading date (dateReleve = consumption day)."""
     day = datetime.fromisoformat(str(reading_date)[:10]).date()
     return day - timedelta(days=READING_DATE_OFFSET_DAYS)
 

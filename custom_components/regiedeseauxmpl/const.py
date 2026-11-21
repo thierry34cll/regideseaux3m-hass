@@ -29,7 +29,7 @@ DEFAULT_NAME = "Régie des Eaux Montpellier"
 STORAGE_KEY_HISTORY = f"{DOMAIN}_history_imported"
 
 # A reading published on day D reflects the consumption of day D-1.
-READING_DATE_OFFSET_DAYS = 1
+READING_DATE_OFFSET_DAYS = 0  # vérifié vs site Régie des Eaux : dateReleve = jour de consommation
 # How far back the API is queried for the history import (the server may cap it).
 HISTORY_LOOKBACK_DAYS = 1095  # ~3 years
 
