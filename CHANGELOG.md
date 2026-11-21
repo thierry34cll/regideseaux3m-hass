@@ -10,6 +10,7 @@ et ce projet adhère à [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ## [Non publié]
 
 ### Ajouté
+- **Réauthentification** : si les identifiants deviennent invalides (mot de passe changé côté Régie), HA propose de les ressaisir sans supprimer l'entrée de configuration
 - **Relevé quotidien à heure fixe** (champ « Heure de relevé quotidienne », défaut `05:00`, à l'installation et dans les options) à la place de l'intervalle glissant : l'heure de relevé ne dépend plus du dernier redémarrage de HA
 - **Attribution des relevés à leur date réelle de consommation** : les relevés (qui portent `dateReleve` côté API) sont écrits comme **statistique externe** `regiedeseauxmpl:<compteur>` (à sélectionner dans Énergie → Eau) via `async_add_external_statistics`, à la date du `dateReleve` (vérifié contre le site de la Régie) — HA ne permet pas d'antidater un état, et le capteur TOTAL_INCREASING a déjà ses propres statistiques
 - **Option de lissage** (« Lisser la consommation sur les jours sans relevé ») : répartit la consommation cumulée d'un relevé sur les jours sans relevé (ex. 1 m³ après 3 jours → ~0,33 m³/jour)

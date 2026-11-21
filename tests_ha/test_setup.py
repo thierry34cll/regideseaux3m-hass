@@ -2,12 +2,14 @@
 
 from unittest.mock import AsyncMock, patch
 
-from homeassistant.config_entries import ConfigEntryState
+from homeassistant.config_entries import ConfigEntryState, SOURCE_REAUTH
+from homeassistant import config_entries
+from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from homeassistant.setup import async_setup_component
 
-from custom_components.regiedeseauxmpl.const import DOMAIN
+from custom_components.regiedeseauxmpl.const import CONF_PASSWORD, CONF_USERNAME, DOMAIN
 
 
 async def test_setup_creates_device_and_sensor(hass, mock_api, config_entry):
@@ -328,3 +330,33 @@ def test_manifest_declares_recorder_dependency():
         (Path(__file__).parent.parent / "custom_components/regiedeseauxmpl/manifest.json").read_text()
     )
     assert "recorder" in manifest["dependencies"]
+
+
+async def test_reauth_flow_updates_credentials(hass, mock_api, config_entry):
+    """When the API rejects the credentials, the reauth flow lets the user
+    update username/password without deleting the config entry."""
+    config_entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN,
+        context={"source": config_entries.SOURCE_REAUTH, "entry_id": config_entry.entry_id},
+        data=config_entry.data,
+    )
+    assert result["type"] == FlowResultType.FORM
+    assert result["step_id"] == "reauth_confirm"
+
+    with patch(
+        "custom_components.regiedeseauxmpl.api.RegieDesEauxAPI.async_authenticate",
+        new=AsyncMock(return_value=True),
+    ):
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            {CONF_USERNAME: "new@example.com", CONF_PASSWORD: "newsecret"},
+        )
+    await hass.async_block_till_done()
+    assert result["type"] == FlowResultType.ABORT
+    assert result["reason"] == "reauth_successful"
+    assert config_entry.data[CONF_USERNAME] == "new@example.com"
+    assert config_entry.data[CONF_PASSWORD] == "newsecret"

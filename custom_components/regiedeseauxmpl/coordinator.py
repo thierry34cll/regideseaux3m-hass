@@ -5,13 +5,14 @@ from collections.abc import Callable
 from datetime import datetime, time
 
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.event import async_track_time_change
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 
 from .api import RegieDesEauxAPI
 from .const import DEFAULT_UPDATE_TIME, DOMAIN, LOGGER
-from .exceptions import RegieDesEauxError
+from .exceptions import InvalidAuth, RegieDesEauxError
 
 
 def parse_update_time(value: str | time | None) -> time:
@@ -105,5 +106,9 @@ class RegieDesEauxCoordinator(DataUpdateCoordinator[dict]):
             data["last_updated"] = dt_util.now().isoformat()
             return data
 
+        except InvalidAuth as err:
+            # Triggers the reauth flow so the user can update credentials
+            # without deleting the config entry.
+            raise ConfigEntryAuthFailed(f"Invalid credentials: {err}") from err
         except RegieDesEauxError as err:
             raise UpdateFailed(f"Error communicating with API: {err}") from err

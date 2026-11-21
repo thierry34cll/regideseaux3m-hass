@@ -1,50 +1,59 @@
 {
-    "config": {
-        "step": {
-            "user": {
-                "title": "Régie des Eaux Montpellier",
-                "description": "Saisissez vos identifiants pour la Régie des Eaux de Montpellier Méditerranée Métropole.",
-                "data": {
-                    "username": "E-mail / Identifiant",
-                    "password": "Mot de passe",
-                    "update_time": "Heure de relevé quotidienne",
-                    "import_history": "Récupérer l'historique de consommation disponible en ligne",
-                    "overwrite_history": "Écraser la statistique importée avant de la réimporter (via les API du recorder ; l'historique du capteur se purge manuellement dans Outils de développement)"
-                }
-            }
-        },
-        "error": {
-            "cannot_connect": "Échec de connexion au serveur. Vérifiez votre connexion internet.",
-            "invalid_auth": "Authentification invalide. Vérifiez votre email et mot de passe.",
-            "unknown": "Une erreur inattendue est survenue."
-        },
-        "abort": {
-            "title": "Configuration annulée",
-            "description_placeholder": ""
+  "config": {
+    "step": {
+      "user": {
+        "title": "Régie des Eaux Montpellier",
+        "description": "Saisissez vos identifiants pour la Régie des Eaux de Montpellier Méditerranée Métropole.",
+        "data": {
+          "username": "E-mail / Identifiant",
+          "password": "Mot de passe",
+          "update_time": "Heure de relevé quotidienne",
+          "import_history": "Récupérer l'historique de consommation disponible en ligne",
+          "overwrite_history": "Écraser la statistique importée avant de la réimporter (via les API du recorder ; l'historique du capteur se purge manuellement dans Outils de développement)"
         }
+      },
+      "reauth_confirm": {
+        "title": "Régie des Eaux Montpellier — Réauthentification",
+        "description": "Vos identifiants ont changé ou ne sont plus valides. Saisissez-les à nouveau.",
+        "data": {
+          "username": "E-mail / Identifiant",
+          "password": "Nouveau mot de passe"
+        }
+      }
     },
-    "options": {
-        "step": {
-            "init": {
-                "title": "Options de la Régie des Eaux Montpellier",
-                "description": "Le compteur est relevé une fois par jour à l'heure configurée. La Régie publie la veille dans la nuit. Si aucun relevé n'a lieu certains jours, le relevé suivant cumule plusieurs jours : le lissage répartit alors cette consommation sur les jours manquants (ex. 1 m³ après 3 jours sans relevé → ~0,33 m³/jour).",
-                "data": {
-                    "update_time": "Heure de relevé quotidienne",
-                    "smooth_consumption": "Lisser la consommation sur les jours sans relevé"
-                }
-            }
-        }
+    "error": {
+      "cannot_connect": "Échec de connexion au serveur. Vérifiez votre connexion internet.",
+      "invalid_auth": "Authentification invalide. Vérifiez votre email et mot de passe.",
+      "unknown": "Une erreur inattendue est survenue."
     },
-    "entity": {
-        "sensor": {
-            "water_index": {
-                "name": "Index d'eau"
-            }
-        }
-    },
-    "state": {
-        "regiedeseauxmpl": {
-            "water": "{} m³"
-        }
+    "abort": {
+      "title": "Configuration annulée",
+      "description_placeholder": "",
+      "reauth_successful": "Identifiants mis à jour, l'intégration a été rechargée."
     }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Options de la Régie des Eaux Montpellier",
+        "description": "Le compteur est relevé une fois par jour à l'heure configurée. La Régie publie la veille dans la nuit. Si aucun relevé n'a lieu certains jours, le relevé suivant cumule plusieurs jours : le lissage répartit alors cette consommation sur les jours manquants (ex. 1 m³ après 3 jours sans relevé → ~0,33 m³/jour).",
+        "data": {
+          "update_time": "Heure de relevé quotidienne",
+          "smooth_consumption": "Lisser la consommation sur les jours sans relevé"
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "water_index": {
+        "name": "Index d'eau"
+      }
+    }
+  },
+  "state": {
+    "regiedeseauxmpl": {
+      "water": "{} m³"
+    }
+  }
 }

@@ -1,50 +1,59 @@
 {
-    "config": {
-        "step": {
-            "user": {
-                "title": "Régie des Eaux Montpellier",
-                "description": "Enter your credentials for Régie des Eaux de Montpellier Méditerranée Métropole.",
-                "data": {
-                    "username": "Email / Username",
-                    "password": "Password",
-                    "update_time": "Daily reading time",
-                    "import_history": "Import all consumption history available online",
-                    "overwrite_history": "Overwrite the imported statistic before re-importing (recorder APIs only; sensor history is purged manually in Developer tools)"
-                }
-            }
-        },
-        "error": {
-            "cannot_connect": "Failed to connect to server. Check your internet connection.",
-            "invalid_auth": "Invalid authentication. Check your email and password.",
-            "unknown": "An unexpected error occurred."
-        },
-        "abort": {
-            "title": "Configuration aborted",
-            "description_placeholder": ""
+  "config": {
+    "step": {
+      "user": {
+        "title": "Régie des Eaux Montpellier",
+        "description": "Enter your credentials for Régie des Eaux de Montpellier Méditerranée Métropole.",
+        "data": {
+          "username": "Email / Username",
+          "password": "Password",
+          "update_time": "Daily reading time",
+          "import_history": "Import all consumption history available online",
+          "overwrite_history": "Overwrite the imported statistic before re-importing (recorder APIs only; sensor history is purged manually in Developer tools)"
         }
+      },
+      "reauth_confirm": {
+        "title": "Régie des Eaux Montpellier — Reauthentication",
+        "description": "Your credentials changed or are no longer valid. Please enter them again.",
+        "data": {
+          "username": "Email / Username",
+          "password": "New password"
+        }
+      }
     },
-    "options": {
-        "step": {
-            "init": {
-                "title": "Régie des Eaux Montpellier options",
-                "description": "The water meter is read once a day at the configured time. The Régie publishes the previous day's reading overnight. When no reading happens for several days, the next reading is cumulative: smoothing spreads that consumption over the missing days (e.g. 1 m³ after 3 days without a reading → ~0.33 m³/day).",
-                "data": {
-                    "update_time": "Daily reading time",
-                    "smooth_consumption": "Smooth consumption over days without a reading"
-                }
-            }
-        }
+    "error": {
+      "cannot_connect": "Failed to connect to server. Check your internet connection.",
+      "invalid_auth": "Invalid authentication. Check your email and password.",
+      "unknown": "An unexpected error occurred."
     },
-    "entity": {
-        "sensor": {
-            "water_index": {
-                "name": "Water index"
-            }
-        }
-    },
-    "state": {
-        "regiedeseauxmpl": {
-            "water": "{} m³"
-        }
+    "abort": {
+      "title": "Configuration aborted",
+      "description_placeholder": "",
+      "reauth_successful": "Credentials updated, the integration was reloaded."
     }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Régie des Eaux Montpellier options",
+        "description": "The water meter is read once a day at the configured time. The Régie publishes the previous day's reading overnight. When no reading happens for several days, the next reading is cumulative: smoothing spreads that consumption over the missing days (e.g. 1 m³ after 3 days without a reading → ~0.33 m³/day).",
+        "data": {
+          "update_time": "Daily reading time",
+          "smooth_consumption": "Smooth consumption over days without a reading"
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "water_index": {
+        "name": "Water index"
+      }
+    }
+  },
+  "state": {
+    "regiedeseauxmpl": {
+      "water": "{} m³"
+    }
+  }
 }
