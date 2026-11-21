@@ -1,6 +1,7 @@
 """Tests for the dated-statistics computation (Régie des Eaux readings)."""
 
 from datetime import UTC, date, datetime
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -110,20 +111,24 @@ async def test_import_readings_skips_existing_days():
             hass, "C0001", "Compteur", readings, smooth=False
         )
 
-    assert imported == 1  # only 2026-11-03 reading (consumption 11-02) is new
+    # baseline row (10-31, same sum as first reading) + the new 11-02 row;
+    # the 11-01 row already exists and is skipped
+    assert imported == 2
     assert mock_import.call_count == 1
     metadata, stats = mock_import.call_args.args[1], mock_import.call_args.args[2]
     # external statistic, source aligned with the statistic_id domain
     assert metadata.statistic_id == "regiedeseauxmpl:c0001"
     assert metadata.source == "regiedeseauxmpl"
-    assert len(stats) == 1
-    assert stats[0].start == datetime(2026, 11, 2, tzinfo=UTC)
-    assert stats[0].sum == 101.0
+    assert [(st.start, st.sum) for st in stats] == [
+        (datetime(2026, 10, 31, tzinfo=UTC), 100.0),
+        (datetime(2026, 11, 2, tzinfo=UTC), 101.0),
+    ]
 
 
 @pytest.mark.asyncio
 async def test_import_readings_nothing_new():
-    """When everything already exists, no import call is made."""
+    """When the reading day already exists, only the baseline row (day before
+    the first reading) may still be missing and gets imported alone."""
     hass = MagicMock()
     readings = [{"date": "2026-11-02", "index": 100.0}]
     with (
@@ -136,6 +141,10 @@ async def test_import_readings_nothing_new():
             new=lambda s: s.lower(),
         ),
         patch(
+            "custom_components.regiedeseauxmpl.statistics.StatisticData",
+            new=lambda **kw: SimpleNamespace(**kw),
+        ),
+        patch(
             "custom_components.regiedeseauxmpl.statistics.async_add_external_statistics"
         ) as mock_import,
     ):
@@ -143,8 +152,10 @@ async def test_import_readings_nothing_new():
             hass, "C0001", "Compteur", readings, smooth=False
         )
 
-    assert imported == 0
-    mock_import.assert_not_called()
+    assert imported == 1  # only the baseline row (10-31) is missing
+    stats = mock_import.call_args.args[2]
+    assert stats[0].start == datetime(2026, 10, 31, tzinfo=UTC)
+    assert stats[0].sum == 100.0
 
 
 @pytest.mark.asyncio

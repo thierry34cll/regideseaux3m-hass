@@ -143,6 +143,12 @@ async def async_import_readings(
     if not rows:
         return 0
 
+    # Baseline row the day BEFORE the first reading, with the same cumulative
+    # value: without it, HA treats the first row's "sum" as a one-off
+    # consumption (e.g. the full 300 m³ index shown on a single day).
+    first_day, first_cumulative = rows[0]
+    rows = [(first_day - timedelta(days=1), first_cumulative)] + rows
+
     first_start = dt_util.start_of_local_day(
         datetime.combine(rows[0][0], time.min)
     ).astimezone(UTC)
