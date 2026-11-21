@@ -21,5 +21,6 @@
   "service.refresh_meters.description": "Force le rafraîchissement de tous les compteurs d'eau",
   "config_flow.reauth_confirm.title": "Régie des Eaux Montpellier — Réauthentification",
   "config_flow.reauth_confirm.description": "Vos identifiants ont changé. Saisissez-les à nouveau.",
-  "config_flow.reauth_successful": "Identifiants mis à jour."
+  "config_flow.reauth_successful": "Identifiants mis à jour.",
+  "config_flow.smooth_consumption": "Lisser la consommation sur les jours sans relevé"
 }

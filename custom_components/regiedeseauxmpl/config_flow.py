@@ -129,6 +129,9 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     CONF_UPDATE_TIME, default=DEFAULT_UPDATE_TIME
                 ): TIME_SELECTOR,
                 vol.Optional(
+                    CONF_SMOOTH_CONSUMPTION, default=DEFAULT_SMOOTH_CONSUMPTION
+                ): BooleanSelector(),
+                vol.Optional(
                     CONF_IMPORT_HISTORY, default=DEFAULT_IMPORT_HISTORY
                 ): BooleanSelector(),
                 vol.Optional(

@@ -77,7 +77,11 @@ async def test_setup_from_ui_config_flow(hass, hass_client, mock_api):
         flow = await resp.json()
         resp = await client.post(
             f"/api/config/config_entries/flow/{flow['flow_id']}",
-            json={"username": "test@example.com", "password": "secret"},
+            json={
+                "username": "test@example.com",
+                "password": "secret",
+                "smooth_consumption": True,
+            },
         )
         assert resp.status == 200, await resp.text()
         result = await resp.json()
@@ -86,6 +90,7 @@ async def test_setup_from_ui_config_flow(hass, hass_client, mock_api):
     assert result["type"] == "create_entry"
     entry = hass.config_entries.async_get_entry(result["result"]["entry_id"])
     assert entry.state is ConfigEntryState.LOADED
+    assert entry.data["smooth_consumption"] is True  # lissage dispo dès l'installation
     assert len(er.async_entries_for_config_entry(er.async_get(hass), entry.entry_id)) == 1
 
 
