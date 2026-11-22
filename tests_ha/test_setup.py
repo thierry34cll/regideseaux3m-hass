@@ -135,7 +135,7 @@ async def test_readings_synced_to_external_statistics(hass, mock_api, config_ent
     assert [s["sum"] for s in stats] == [0.0, 1.0]
     local = [s["start"].astimezone(dt_util.DEFAULT_TIME_ZONE) for s in stats]
     assert [d.date().isoformat() for d in local] == ["2026-10-19", "2026-10-20"]
-    assert all(d.strftime("%H:%M") == "23:30" for d in local)  # stamped end of day
+    assert all(d.strftime("%H:%M") == "23:00" for d in local)  # stamped 23:00 (hour boundary required by HA)
 
 
 async def test_smooth_consumption_spreads_gap(hass, mock_api):
@@ -190,7 +190,7 @@ async def test_smooth_consumption_spreads_gap(hass, mock_api):
     assert [d.date().isoformat() for d in local] == [
         "2026-10-19", "2026-10-20", "2026-10-21", "2026-10-22",
     ]
-    assert all(d.strftime("%H:%M") == "23:30" for d in local)
+    assert all(d.strftime("%H:%M") == "23:00" for d in local)
     assert [round(s["sum"], 3) for s in stats] == [0.0, 0.333, 0.667, 1.0]
 
 

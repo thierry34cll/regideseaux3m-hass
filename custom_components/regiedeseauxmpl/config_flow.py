@@ -52,7 +52,6 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle a config flow for Régie des Eaux Montpellier."""
 
     VERSION = 2
-    CONNECTION_CLASS = config_entries.CONN_CLASS_CLOUD_POLL
 
     async def async_step_user(
         self, user_input: dict[str, str] | None = None

@@ -194,7 +194,8 @@ async def async_import_readings(
 
     stats = []
     for day, cumulative in rows:
-        # Stamp the row at end of day (23:30 local) instead of 00:00: the
+        # Stamp the row at end of day (23:00 local, hour boundary required by HA)
+        # instead of 00:00: the
         # Energy dashboard buckets by calendar day either way, but the
         # statistics UI then shows the value at 23:30, not at midnight.
         start = (

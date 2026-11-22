@@ -82,7 +82,7 @@ async def test_import_readings_skips_existing_days():
         {"date": "2026-11-02", "index": 100.0},
         {"date": "2026-11-03", "index": 101.0},
     ]
-    existing_start = datetime(2026, 11, 2, 23, 30, tzinfo=UTC).timestamp()  # reading 11-02 stamped 23:30
+    existing_start = datetime(2026, 11, 2, 23, 0, tzinfo=UTC).timestamp()  # reading 11-02 stamped 23:30
 
     from types import SimpleNamespace
 
@@ -120,7 +120,7 @@ async def test_import_readings_skips_existing_days():
     assert metadata.statistic_id == "regiedeseauxmpl:c0001"
     assert metadata.source == "regiedeseauxmpl"
     assert [(st.start, st.sum) for st in stats] == [
-        (datetime(2026, 11, 3, 23, 30, tzinfo=UTC), 1.0),
+        (datetime(2026, 11, 3, 23, 0, tzinfo=UTC), 1.0),
     ]
 
 
@@ -132,7 +132,7 @@ async def test_import_readings_nothing_new():
     with (
         patch(
             "custom_components.regiedeseauxmpl.statistics._existing_start_timestamps",
-            new=AsyncMock(return_value={datetime(2026, 11, 2, 23, 30, tzinfo=UTC).timestamp()}),
+            new=AsyncMock(return_value={datetime(2026, 11, 2, 23, 0, tzinfo=UTC).timestamp()}),
         ),
         patch(
             "custom_components.regiedeseauxmpl.statistics.slugify",
