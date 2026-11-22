@@ -14,15 +14,21 @@
 
 Cette intégration concerne **tous les usagers** de la Régie des Eaux de **Montpellier Méditerranée Métropole**, qui regroupe **31 communes** :
 
-- Montpellier
-- Castelnau-le-Lez
-- Lattes
-- Pérols
-- Saint-Geniès-des-Mourguieres
-- Fabrègues
-- Lavérune
-- Village-neuf
-- Et les 23 autres communes de la métropole
+| Commune | Commune | Commune |
+|---|---|---|
+| Baillargues | Beaulieu | Castelnau-le-Lez |
+| Castries | Clapiers | Cournonsec |
+| Cournonterral | Fabrègues | Grabels |
+| Jacou | Juvignac | Lattes |
+| Lavérune | Le Crès | Montpellier |
+| Montaud | Montferrier-sur-Lez | Murviel-lès-Montpellier |
+| Pérols | Pignan | Prades-le-Lez |
+| Restinclières | Saint-Brès | Saint-Drézéry |
+| Saint-Georges-d'Orques | Saint-Geniès-des-Mourgues | Saint-Jean-de-Védas |
+| Saussan | Sussargues | Vendargues |
+| Villeneuve-lès-Maguelone |  |  |
+
+*Liste officielle : [data.montpellier3m.fr/communes](https://data.montpellier3m.fr/communes)*
 
 **Missions principales :**
 - ✅ **Distribution d'eau potable** - Fourniture d'eau de qualité
