@@ -3,11 +3,17 @@
   "name": "Régie des Eaux 3M - Water Consumption",
   "documentation": "https://github.com/iopsthecloud/regideseaux3m-hass",
   "issue_tracker": "https://github.com/iopsthecloud/regideseaux3m-hass/issues",
-  "dependencies": ["recorder"],
-  "codeowners": ["@iopsthecloud"],
-  "requirements": ["curl_cffi>=0.6.0"],
+  "dependencies": [
+    "recorder"
+  ],
+  "codeowners": [
+    "@iopsthecloud"
+  ],
+  "requirements": [
+    "curl_cffi>=0.6.0"
+  ],
   "iot_class": "cloud_polling",
-  "version": "0.3.1-beta",
+  "version": "0.3.1",
   "integration_type": "hub",
   "config_flow": true,
   "single_config_entry": false,

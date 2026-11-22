@@ -7,7 +7,7 @@ et ce projet adhère à [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
-## [Non publié]
+## [0.3.1] - 2026-11-21
 
 ### Ajouté
 - **Réauthentification** : si les identifiants deviennent invalides (mot de passe changé côté Régie), HA propose de les ressaisir sans supprimer l'entrée de configuration
