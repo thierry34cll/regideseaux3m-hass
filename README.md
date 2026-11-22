@@ -667,7 +667,7 @@ regiedeseauxmpl/
 │   ├── test_coordinator.py                   # Tests du coordinator
 │   └── test_sensor.py                        # Tests des sensors
 │
-├── brand/                                   # Assets pour Marketplace (OBLIGATOIRE)
+├── brand/                                   # Assets Marketplace à la racine (OBLIGATOIRE) + brand/ dans custom_components (icône HA)
 │   └── icon.png                             # Icône 512x512
 │
 ├── .github/workflows/                       # CI/CD
