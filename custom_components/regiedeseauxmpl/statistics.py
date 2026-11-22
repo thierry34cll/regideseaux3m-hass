@@ -46,6 +46,8 @@ from homeassistant.util import slugify
 from .const import (
     CONF_OVERWRITE_HISTORY,
     CONF_SMOOTH_CONSUMPTION,
+    DAILY_STATISTIC_HOUR,
+    DAILY_STATISTIC_MINUTE,
     DEFAULT_OVERWRITE_HISTORY,
     DEFAULT_SMOOTH_CONSUMPTION,
     DOMAIN,
@@ -192,8 +194,12 @@ async def async_import_readings(
 
     stats = []
     for day, cumulative in rows:
-        start = dt_util.start_of_local_day(
-            datetime.combine(day, time.min)
+        # Stamp the row at end of day (23:30 local) instead of 00:00: the
+        # Energy dashboard buckets by calendar day either way, but the
+        # statistics UI then shows the value at 23:30, not at midnight.
+        start = (
+            dt_util.start_of_local_day(datetime.combine(day, time.min))
+            + timedelta(hours=DAILY_STATISTIC_HOUR, minutes=DAILY_STATISTIC_MINUTE)
         ).astimezone(UTC)
         if start.timestamp() in existing_starts:
             continue

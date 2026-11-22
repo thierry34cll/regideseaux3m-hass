@@ -8,6 +8,7 @@ from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from homeassistant.setup import async_setup_component
+from homeassistant.util import dt as dt_util
 
 from custom_components.regiedeseauxmpl.const import CONF_PASSWORD, CONF_USERNAME, DOMAIN
 
@@ -132,9 +133,9 @@ async def test_readings_synced_to_external_statistics(hass, mock_api, config_ent
     # RELATIVE to the first reading (122.456) so the first row is 0 and HA
     # never counts the whole meter index as one day's consumption
     assert [s["sum"] for s in stats] == [0.0, 1.0]
-    assert [s["start"].date().isoformat() for s in stats] == [
-        "2026-10-19", "2026-10-20",
-    ]
+    local = [s["start"].astimezone(dt_util.DEFAULT_TIME_ZONE) for s in stats]
+    assert [d.date().isoformat() for d in local] == ["2026-10-19", "2026-10-20"]
+    assert all(d.strftime("%H:%M") == "23:30" for d in local)  # stamped end of day
 
 
 async def test_smooth_consumption_spreads_gap(hass, mock_api):
@@ -185,9 +186,11 @@ async def test_smooth_consumption_spreads_gap(hass, mock_api):
     stats = mock_queue.call_args.args[2]
     # consumption days 10-19..10-22 with the 1 m³ gap spread; sums relative
     # to the first reading (122.0)
-    assert [s["start"].date().isoformat() for s in stats] == [
+    local = [s["start"].astimezone(dt_util.DEFAULT_TIME_ZONE) for s in stats]
+    assert [d.date().isoformat() for d in local] == [
         "2026-10-19", "2026-10-20", "2026-10-21", "2026-10-22",
     ]
+    assert all(d.strftime("%H:%M") == "23:30" for d in local)
     assert [round(s["sum"], 3) for s in stats] == [0.0, 0.333, 0.667, 1.0]
 
 
