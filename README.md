@@ -744,6 +744,7 @@ Ce projet est sous licence **MIT** - voir le fichier [LICENSE](LICENSE) pour plu
 
 - **Home Assistant** pour la plateforme incroyable et ouverte
 - **Marketplace (ex HACS)** pour simplifier l'installation des intégrations personnalisées
+- **Mistral Vibe** pour le développement assisté de la v0.3.1 (relevé quotidien à heure fixe, historique daté, statistiques externes)
 - **Montpellier Méditerranée Métropole** et **la Régie des Eaux** pour leur service public essentiel
 - **Tous les contributeurs** qui aident à améliorer ce projet
 - **Les utilisateurs** qui testent et remontent les problèmes
